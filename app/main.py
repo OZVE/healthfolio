@@ -9,7 +9,19 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, Header
 from fastapi.responses import PlainTextResponse
 
-# Importaciones con manejo de errores
+# Cargar variables de entorno desde el archivo .env en la raíz del proyecto
+load_dotenv(Path(__file__).parent.parent / ".env")
+
+app = FastAPI()
+
+# Configurar logging PRIMERO
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Importaciones con manejo de errores (DESPUÉS de definir logger)
 try:
     from .mcp_gateway import process
     logger.info("✅ MCP Gateway importado correctamente")
@@ -39,18 +51,6 @@ except ImportError as e:
         return False
     def log_twilio_config():
         pass
-
-# Cargar variables de entorno desde el archivo .env en la raíz del proyecto
-load_dotenv(Path(__file__).parent.parent / ".env")
-
-app = FastAPI()
-
-# Configurar logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 # Log de inicio para debugging
 logger.info("🚀 Iniciando aplicación Healtfolio...")
