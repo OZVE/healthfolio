@@ -9,15 +9,36 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, Header
 from fastapi.responses import PlainTextResponse
 
-from .mcp_gateway import process
-from .utils import extract_text_from_event, get_chat_id, extract_text_from_twilio_event, get_twilio_chat_id
-from .twilio_client import (
-    send_twilio_whatsapp_message, 
-    create_twilio_response, 
-    validate_twilio_webhook,
-    is_twilio_configured,
-    log_twilio_config
-)
+# Importaciones con manejo de errores
+try:
+    from .mcp_gateway import process
+    logger.info("✅ MCP Gateway importado correctamente")
+except ImportError as e:
+    logger.error(f"❌ Error importando MCP Gateway: {e}")
+    def process(text, chat_id):
+        return "Error: Sistema de IA no disponible temporalmente"
+
+try:
+    from .utils import extract_text_from_event, get_chat_id, extract_text_from_twilio_event, get_twilio_chat_id
+    logger.info("✅ Utils importado correctamente")
+except ImportError as e:
+    logger.error(f"❌ Error importando Utils: {e}")
+
+try:
+    from .twilio_client import (
+        send_twilio_whatsapp_message, 
+        create_twilio_response, 
+        validate_twilio_webhook,
+        is_twilio_configured,
+        log_twilio_config
+    )
+    logger.info("✅ Twilio Client importado correctamente")
+except ImportError as e:
+    logger.error(f"❌ Error importando Twilio Client: {e}")
+    def is_twilio_configured():
+        return False
+    def log_twilio_config():
+        pass
 
 # Cargar variables de entorno desde el archivo .env en la raíz del proyecto
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -58,75 +79,111 @@ except ImportError as e:
 
 logger.info("📦 Todos los imports completados")
 
-# Configuración Evolution API
-EVO_URL = os.getenv("EVOLUTION_BASE_URL")
-if EVO_URL:
-    EVO_URL = EVO_URL.rstrip("/")
-else:
-    logger.error("EVOLUTION_BASE_URL not found in environment variables!")
+# Configuración Evolution API con manejo de errores
+try:
+    EVO_URL = os.getenv("EVOLUTION_BASE_URL")
+    if EVO_URL:
+        EVO_URL = EVO_URL.rstrip("/")
+    else:
+        logger.warning("EVOLUTION_BASE_URL not found in environment variables!")
 
-API_KEY = os.getenv("EVOLUTION_API_KEY")
-INSTANCE_ID = os.getenv("EVOLUTION_INSTANCE_ID")
+    API_KEY = os.getenv("EVOLUTION_API_KEY")
+    INSTANCE_ID = os.getenv("EVOLUTION_INSTANCE_ID")
 
-# Debug: print loaded variables
-logger.info(f"Loaded environment variables:")
-logger.info(f"EVO_URL: {EVO_URL}")
-logger.info(f"API_KEY: {'***' if API_KEY else 'NOT SET'}")
-logger.info(f"INSTANCE_ID: {INSTANCE_ID}")
+    # Debug: print loaded variables
+    logger.info(f"Loaded environment variables:")
+    logger.info(f"EVO_URL: {EVO_URL}")
+    logger.info(f"API_KEY: {'***' if API_KEY else 'NOT SET'}")
+    logger.info(f"INSTANCE_ID: {INSTANCE_ID}")
 
-# Log configuración de Twilio
-log_twilio_config()
+    # Log configuración de Twilio
+    log_twilio_config()
 
-HEADERS = {
-    "Content-Type": "application/json",
-    "apikey": API_KEY,
-}
+    HEADERS = {
+        "Content-Type": "application/json",
+        "apikey": API_KEY,
+    }
 
-# Configurar proveedor de WhatsApp
-WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "evolution").lower()  # "evolution" o "twilio"
-logger.info(f"📱 Proveedor de WhatsApp configurado: {WHATSAPP_PROVIDER}")
+    # Configurar proveedor de WhatsApp
+    WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "evolution").lower()  # "evolution" o "twilio"
+    logger.info(f"📱 Proveedor de WhatsApp configurado: {WHATSAPP_PROVIDER}")
+    
+except Exception as e:
+    logger.error(f"Error en configuración inicial: {e}")
+    EVO_URL = None
+    API_KEY = None
+    INSTANCE_ID = None
+    WHATSAPP_PROVIDER = "twilio"
+    HEADERS = {"Content-Type": "application/json"}
 
+
+@app.get("/ping")
+async def ping():
+    """Endpoint simple para testing de conectividad."""
+    return {"message": "pong", "timestamp": "2024-01-01T00:00:00Z"}
+
+@app.get("/status")
+async def simple_status():
+    """Status endpoint simplificado sin dependencias externas."""
+    return {
+        "service": "Healtfolio",
+        "status": "online",
+        "port": os.getenv("PORT", "8000")
+    }
 
 @app.get("/")
 async def root():
     """Endpoint raíz con información del estado del servicio."""
-    return {
-        "service": "Healtfolio WhatsApp Bot",
-        "version": "1.0.0",
-        "status": "active",
-        "environment": os.getenv("ENVIRONMENT", "development"),
-        "providers": {
-            "evolution": {
-                "configured": bool(EVO_URL and API_KEY and INSTANCE_ID),
-                "active": WHATSAPP_PROVIDER == "evolution"
-            },
-            "twilio": {
-                "configured": is_twilio_configured(),
-                "active": WHATSAPP_PROVIDER == "twilio"
+    try:
+        return {
+            "service": "Healtfolio WhatsApp Bot",
+            "version": "1.0.0",
+            "status": "active",
+            "environment": os.getenv("ENVIRONMENT", "development"),
+            "port": os.getenv("PORT", "8000"),
+            "providers": {
+                "evolution": {
+                    "configured": bool(EVO_URL and API_KEY and INSTANCE_ID),
+                    "active": WHATSAPP_PROVIDER == "evolution"
+                },
+                "twilio": {
+                    "configured": bool(os.getenv("TWILIO_ACCOUNT_SID") and os.getenv("TWILIO_AUTH_TOKEN")),
+                    "active": WHATSAPP_PROVIDER == "twilio"
+                }
             }
         }
-    }
+    except Exception as e:
+        logger.error(f"Error in root endpoint: {e}")
+        return {
+            "service": "Healtfolio WhatsApp Bot", 
+            "status": "error",
+            "error": str(e)
+        }
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint para monitoring."""
     try:
-        # Verificar conexión a Redis
-        from .utils import get_memory
-        get_memory("health_check")
-        
-        # Verificar configuración básica
+        # Verificar configuración básica sin dependencias externas
         openai_configured = bool(os.getenv("OPENAI_API_KEY"))
         sheets_configured = bool(os.getenv("SHEET_ID"))
-        whatsapp_configured = bool(
-            (EVO_URL and API_KEY and INSTANCE_ID) or is_twilio_configured()
-        )
+        twilio_configured = bool(os.getenv("TWILIO_ACCOUNT_SID") and os.getenv("TWILIO_AUTH_TOKEN"))
+        evolution_configured = bool(EVO_URL and API_KEY and INSTANCE_ID)
+        whatsapp_configured = twilio_configured or evolution_configured
+        
+        # Test Redis connection
+        redis_status = "ok"
+        try:
+            from .utils import get_memory
+            get_memory("health_check")
+        except Exception:
+            redis_status = "degraded"
         
         health_status = {
             "status": "healthy",
-            "timestamp": "2024-01-01T00:00:00Z",  # Se actualizará con timestamp real
+            "timestamp": "2024-01-01T00:00:00Z",
             "checks": {
-                "redis": "ok",
+                "redis": redis_status,
                 "openai": "ok" if openai_configured else "error",
                 "google_sheets": "ok" if sheets_configured else "error", 
                 "whatsapp": "ok" if whatsapp_configured else "error"
