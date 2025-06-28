@@ -34,12 +34,13 @@ FIND_PROF_FN = {
     "type": "function",
     "function": {
         "name": "find_professionals",
-        "description": "Devuelve lista de profesionales sanitarios que cubren la ciudad y la especialidad",
+        "description": "Devuelve lista de profesionales sanitarios que cubren la ciudad, especialidad y disponibilidad horaria",
         "parameters": {
             "type": "object",
             "properties": {
-                "specialty": {"type": "string"},
-                "city": {"type": "string"},
+                "specialty": {"type": "string", "description": "Especialidad médica o título profesional"},
+                "city": {"type": "string", "description": "Ciudad o área donde se necesita el servicio"},
+                "availability": {"type": "string", "description": "Día de la semana o horario específico (ej: lunes, martes, fines de semana, etc.). Opcional."}
             },
             "required": ["specialty", "city"],
         },
@@ -109,8 +110,13 @@ def process(user_input: str, chat_id: str) -> str:
         for tc in choice.message.tool_calls:
             if tc.function.name == "find_professionals":
                 args = json.loads(tc.function.arguments)
-                logger.info(f"🏥 Llamando find_professionals con specialty='{args['specialty']}', city='{args['city']}'")
-                pros = find_professionals(args["specialty"], args["city"])
+                availability = args.get("availability")
+                if availability:
+                    logger.info(f"🏥 Llamando find_professionals con specialty='{args['specialty']}', city='{args['city']}', availability='{availability}'")
+                    pros = find_professionals(args["specialty"], args["city"], availability)
+                else:
+                    logger.info(f"🏥 Llamando find_professionals con specialty='{args['specialty']}', city='{args['city']}'")
+                    pros = find_professionals(args["specialty"], args["city"])
                 logger.info(f"📋 Encontrados {len(pros)} profesionales en Google Sheet")
                 logger.info(f"📋 Datos encontrados: {pros}")
                 messages.append({

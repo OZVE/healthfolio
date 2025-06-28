@@ -214,9 +214,62 @@ def normalize_city_search(city: str) -> List[str]:
     logger.info(f"🏙️ Variaciones de ciudad para '{city}': {variations}")
     return variations
 
+def normalize_availability_search(availability: str) -> List[str]:
+    """
+    Normaliza la búsqueda de disponibilidad para encontrar variaciones de días y horarios.
+    """
+    availability_lower = availability.lower().strip()
+    
+    # Crear variaciones de disponibilidad
+    variations = [availability_lower]
+    
+    # Mapeo de días de la semana y horarios comunes
+    availability_mappings = {
+        # Días de la semana
+        "lunes": ["lunes", "monday", "lun"],
+        "martes": ["martes", "tuesday", "mar"],
+        "miércoles": ["miércoles", "miercoles", "wednesday", "mié", "mie"],
+        "miercoles": ["miércoles", "miercoles", "wednesday", "mié", "mie"],
+        "jueves": ["jueves", "thursday", "jue"],
+        "viernes": ["viernes", "friday", "vie"],
+        "sábado": ["sábado", "sabado", "saturday", "sáb", "sab"],
+        "sabado": ["sábado", "sabado", "saturday", "sáb", "sab"],
+        "domingo": ["domingo", "sunday", "dom"],
+        
+        # Grupos de días
+        "fin de semana": ["fin de semana", "fines de semana", "weekend", "sábado", "sabado", "domingo"],
+        "fines de semana": ["fin de semana", "fines de semana", "weekend", "sábado", "sabado", "domingo"],
+        "weekend": ["fin de semana", "fines de semana", "weekend", "sábado", "sabado", "domingo"],
+        "entre semana": ["lunes", "martes", "miércoles", "miercoles", "jueves", "viernes"],
+        "semana": ["lunes", "martes", "miércoles", "miercoles", "jueves", "viernes"],
+        
+        # Horarios
+        "mañana": ["mañana", "morning", "am", "matutino"],
+        "tarde": ["tarde", "afternoon", "pm", "vespertino"],
+        "noche": ["noche", "evening", "night", "nocturno"],
+        "madrugada": ["madrugada", "early morning", "dawn"],
+        
+        # Urgencias
+        "urgencia": ["urgencia", "emergency", "24 horas", "24/7", "siempre"],
+        "emergencia": ["urgencia", "emergency", "24 horas", "24/7", "siempre"],
+        "24 horas": ["urgencia", "emergency", "24 horas", "24/7", "siempre"],
+        "24/7": ["urgencia", "emergency", "24 horas", "24/7", "siempre"],
+    }
+    
+    if availability_lower in availability_mappings:
+        variations.extend(availability_mappings[availability_lower])
+    
+    # Remover duplicados y mantener orden
+    unique_variations = []
+    for v in variations:
+        if v not in unique_variations:
+            unique_variations.append(v)
+    
+    logger.info(f"🕐 Variaciones de disponibilidad para '{availability}': {unique_variations}")
+    return unique_variations
 
-def find_professionals(specialty: str, city: str) -> List[Dict]:
-    """Busca filas que coincidan con especialidad y ciudad."""
+def find_professionals(specialty: str, city: str, availability: str = None) -> List[Dict]:
+    """Busca filas que coincidan con especialidad, ciudad y opcionalmente disponibilidad."""
     logger.info(f"📊 Conectando a Google Sheet ID: {SHEET_ID[:10]}...")
     logger.info(f"📊 Pestaña: {SHEET_TAB}")
     
@@ -232,9 +285,15 @@ def find_professionals(specialty: str, city: str) -> List[Dict]:
             logger.info(f"📊 Primer registro como ejemplo: {rows[0]}")
         
         # Buscar coincidencias con mapeo inteligente
-        logger.info(f"🔍 Buscando specialty='{specialty}' en city='{city}'")
+        search_params = f"specialty='{specialty}', city='{city}'"
+        if availability:
+            search_params += f", availability='{availability}'"
+        logger.info(f"🔍 Buscando con parámetros: {search_params}")
+        
         specialty_terms = normalize_specialty_search(specialty)
         city_terms = normalize_city_search(city)
+        availability_terms = normalize_availability_search(availability) if availability else []
+        
         matches = []
         
         for i, r in enumerate(rows):
@@ -253,23 +312,31 @@ def find_professionals(specialty: str, city: str) -> List[Dict]:
             coverage_area_text = str(r.get("coverage_area", "")).lower()
             city_match = any(term in coverage_area_text for term in city_terms)
             
-            if professional_match and city_match:
-                logger.info(f"✅ Match encontrado en fila {i+1}: {r}")
+            # Buscar disponibilidad si se especificó
+            availability_match = True  # Por defecto True si no se especifica availability
+            if availability:
+                availability_text = str(r.get("availability", "")).lower()
+                availability_match = any(term in availability_text for term in availability_terms)
+                
+                if not availability_match:
+                    logger.info(f"🕐 No match de disponibilidad en fila {i+1}: '{availability_text}' no contiene ninguno de {availability_terms}")
+            
+            if professional_match and city_match and availability_match:
+                logger.info(f"✅ Match completo encontrado en fila {i+1}: {r}")
                 if specialty_match:
                     logger.info(f"✅ Specialty match: '{specialty_text}' contiene alguno de {specialty_terms}")
                 if title_match:
                     logger.info(f"✅ Title match: '{title_text}' contiene alguno de {specialty_terms}")
                 logger.info(f"✅ City match: '{coverage_area_text}' contiene alguno de {city_terms}")
+                if availability:
+                    logger.info(f"✅ Availability match: '{availability_text}' contiene alguno de {availability_terms}")
                 matches.append(r)
+            elif professional_match and city_match:
+                logger.info(f"🔍 Professional y city match (pero no availability) en fila {i+1}: {r}")
             elif professional_match:
-                logger.info(f"🔍 Professional match (pero no city) en fila {i+1}: {r}")
-                if specialty_match:
-                    logger.info(f"🔍 Specialty match: '{specialty_text}' contiene alguno de {specialty_terms}")
-                if title_match:
-                    logger.info(f"🔍 Title match: '{title_text}' contiene alguno de {specialty_terms}")
+                logger.info(f"🔍 Professional match (pero no city/availability) en fila {i+1}: {r}")
             elif city_match:
-                logger.info(f"🔍 City match (pero no professional) en fila {i+1}: {r}")
-                logger.info(f"🔍 City match: '{coverage_area_text}' contiene alguno de {city_terms}")
+                logger.info(f"🔍 City match (pero no professional/availability) en fila {i+1}: {r}")
         
         logger.info(f"📋 Total matches encontrados: {len(matches)}")
         return matches
