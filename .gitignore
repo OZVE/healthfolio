@@ -1,0 +1,164 @@
+# ==========================================
+# HEALTFOLIO - .GITIGNORE
+# ==========================================
+
+# === ARCHIVOS SENSIBLES ===
+.env
+.env.local
+.env.production
+.env.development
+service-account.json
+
+# === PYTHON ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# === ENTORNOS VIRTUALES ===
+venv/
+.venv/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# === FASTAPI/UVICORN ===
+*.log
+logs/
+.uvicorn-pid
+
+# === REDIS ===
+dump.rdb
+*.rdb
+
+# === JUPYTER NOTEBOOKS ===
+.ipynb_checkpoints
+
+# === PYTEST ===
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# === MYPY ===
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# === IDEs y EDITORS ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === SISTEMA OPERATIVO ===
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Linux
+*~
+.nfs*
+
+# === ARCHIVOS ESPECÍFICOS DEL PROYECTO ===
+ngrok/
+test_*.py
+debug_*.py
+configure_*.py
+verify_*.py
+check_configuration.py
+*.tmp
+*.temp
+temp/
+tmp/
+
+# === DOCKER ===
+.dockerignore
+
+# === HERRAMIENTAS DE DESARROLLO ===
+.pytest_cache/
+.coverage
+htmlcov/
+.benchmarks
+.prof
+
+# === ARCHIVOS DE BACKUP ===
+*.bak
+*.backup
+*.old
+*.orig
+
+# === ARCHIVOS DE LOGS ===
+*.log
+logs/
+log/
+
+# === ARCHIVOS DE CONFIGURACIÓN LOCAL ===
+config.local.json
+settings.local.json
+
+# === NODE.JS (si se usa para algún frontend) ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === CERTIFICADOS SSL ===
+*.pem
+*.key
+*.crt
+*.csr
+
+# === ARCHIVOS TEMPORALES DE DESARROLLO ===
+scratch/
+playground/
+examples/local/ 

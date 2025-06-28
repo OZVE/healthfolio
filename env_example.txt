@@ -1,0 +1,71 @@
+# ==========================================
+# HEALTFOLIO - CONFIGURACIÓN DE ENTORNO
+# ==========================================
+
+# === CONFIGURACIÓN GENERAL ===
+WHATSAPP_PROVIDER=evolution  # "evolution" o "twilio"
+
+# === EVOLUTION API (Opción A) ===
+EVOLUTION_BASE_URL=https://evolution-db.onrender.com
+EVOLUTION_API_KEY=tu_api_key_aqui
+EVOLUTION_INSTANCE_ID=tu_instance_id_aqui
+
+# === TWILIO WHATSAPP (Opción B) ===
+TWILIO_ACCOUNT_SID=tu_account_sid_aqui
+TWILIO_AUTH_TOKEN=tu_auth_token_aqui
+TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+
+# === OPENAI ===
+OPENAI_API_KEY=sk-tu_openai_key_aqui
+OPENAI_MODEL=gpt-4o-mini
+
+# === GOOGLE SHEETS ===
+GOOGLE_SERVICE_ACCOUNT_JSON=./service-account.json
+SHEET_ID=tu_google_sheet_id_aqui
+SHEET_TAB=directory
+
+# === REDIS ===
+REDIS_URL=redis://localhost:6379/0
+
+# ==========================================
+# INSTRUCCIONES DE CONFIGURACIÓN
+# ==========================================
+
+# 1. COPIA este archivo como ".env" (sin .example)
+# 2. RELLENA las variables según tu proveedor elegido
+# 3. CONFIGURA Google Sheets y Redis según README.md
+# 4. EJECUTA el script de configuración correspondiente:
+#    - python configure_webhook.py (Evolution API)
+#    - python configure_twilio_webhook.py (Twilio)
+
+# ==========================================
+# PROVEEDORES DE WHATSAPP
+# ==========================================
+
+# EVOLUTION API:
+# - Más fácil para desarrollo
+# - No requiere validación empresarial
+# - Configuración rápida
+# - Ideal para prototipos
+
+# TWILIO:
+# - Más estable y empresarial
+# - Mejor para producción
+# - Requiere cuenta Twilio
+# - Soporte oficial de WhatsApp Business
+
+# ==========================================
+# VARIABLES OPCIONALES
+# ==========================================
+
+# Configuración avanzada de OpenAI
+# OPENAI_TEMPERATURE=0.2
+# OPENAI_MAX_TOKENS=1000
+
+# Configuración de Redis
+# REDIS_TTL=1209600  # 14 días en segundos
+# REDIS_MAX_CONNECTIONS=10
+
+# Configuración de desarrollo
+# DEBUG=true
+# LOG_LEVEL=INFO 

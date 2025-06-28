@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: healtfolio-bot
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: healtfolio-redis
+          property: connectionString
+      - key: EVOLUTION_BASE_URL
+        sync: false
+      - key: EVOLUTION_API_KEY
+        sync: false
+      - key: EVOLUTION_INSTANCE_ID
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SHEET_ID
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_NUMBER
+        sync: false
+      - key: WHATSAPP_PROVIDER
+        value: evolution
+
+  - type: redis
+    name: healtfolio-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru 
