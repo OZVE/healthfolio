@@ -13,6 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar código de la aplicación
 COPY ./app ./app
+COPY start.sh ./start.sh
+
+# Hacer ejecutable el script
+RUN chmod +x start.sh
 
 # El service-account.json se configurará como variable de entorno en Railway
 
@@ -23,5 +27,5 @@ USER appuser
 # Exponer puerto
 EXPOSE 8000
 
-# Comando para ejecutar la aplicación
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Comando para ejecutar la aplicación  
+CMD ["./start.sh"]

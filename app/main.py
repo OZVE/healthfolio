@@ -31,6 +31,33 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Log de inicio para debugging
+logger.info("🚀 Iniciando aplicación Healtfolio...")
+logger.info(f"Python version: {os.sys.version}")
+logger.info(f"Working directory: {os.getcwd()}")
+logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+
+# Verificar imports críticos
+try:
+    import openai
+    logger.info("✅ OpenAI importado correctamente")
+except ImportError as e:
+    logger.error(f"❌ Error importando OpenAI: {e}")
+
+try:
+    import redis
+    logger.info("✅ Redis importado correctamente")
+except ImportError as e:
+    logger.error(f"❌ Error importando Redis: {e}")
+
+try:
+    import gspread
+    logger.info("✅ GSpread importado correctamente")
+except ImportError as e:
+    logger.error(f"❌ Error importando GSpread: {e}")
+
+logger.info("📦 Todos los imports completados")
+
 # Configuración Evolution API
 EVO_URL = os.getenv("EVOLUTION_BASE_URL")
 if EVO_URL:
