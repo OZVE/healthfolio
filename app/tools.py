@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 from pathlib import Path
 from typing import List, Dict
 import gspread
@@ -16,9 +17,30 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets.readonly",
 ]
 
-creds = Credentials.from_service_account_file(
-    os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"), scopes=SCOPES
-)
+# Cargar credenciales de Google - compatible con archivo o variable de entorno
+def load_google_credentials():
+    # Opción 1: Variable de entorno (para producción)
+    service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if service_account_json and service_account_json.startswith("{"):
+        # Es JSON directo en variable de entorno
+        logger.info("🔐 Cargando credenciales desde variable de entorno")
+        service_account_info = json.loads(service_account_json)
+        return Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+    
+    # Opción 2: Archivo local (para desarrollo)  
+    elif service_account_json and os.path.exists(service_account_json):
+        logger.info("🔐 Cargando credenciales desde archivo")
+        return Credentials.from_service_account_file(service_account_json, scopes=SCOPES)
+    
+    # Opción 3: Archivo por defecto
+    elif os.path.exists("./service-account.json"):
+        logger.info("🔐 Cargando credenciales desde archivo por defecto")
+        return Credentials.from_service_account_file("./service-account.json", scopes=SCOPES)
+    
+    else:
+        raise ValueError("No se encontraron credenciales de Google Cloud. Configure GOOGLE_SERVICE_ACCOUNT_JSON")
+
+creds = load_google_credentials()
 client = gspread.authorize(creds)
 
 SHEET_ID = os.getenv("SHEET_ID")
