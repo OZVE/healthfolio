@@ -17,33 +17,32 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets.readonly",
 ]
 
-# Cargar credenciales de Google - compatible con archivo o variable de entorno
 def load_google_credentials():
-    # Opción 1: Variable de entorno (para producción)
+    """Carga credenciales de Google Cloud desde variable de entorno."""
     service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-    if service_account_json and service_account_json.startswith("{"):
+    
+    if not service_account_json:
+        raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON es obligatorio")
+    
+    if service_account_json.startswith("{"):
         # Es JSON directo en variable de entorno
         logger.info("🔐 Cargando credenciales desde variable de entorno")
-        service_account_info = json.loads(service_account_json)
-        return Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
-    
-    # Opción 2: Archivo local (para desarrollo)  
-    elif service_account_json and os.path.exists(service_account_json):
-        logger.info("🔐 Cargando credenciales desde archivo")
-        return Credentials.from_service_account_file(service_account_json, scopes=SCOPES)
-    
-    # Opción 3: Archivo por defecto
-    elif os.path.exists("./service-account.json"):
-        logger.info("🔐 Cargando credenciales desde archivo por defecto")
-        return Credentials.from_service_account_file("./service-account.json", scopes=SCOPES)
-    
+        try:
+            service_account_info = json.loads(service_account_json)
+            return Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"GOOGLE_SERVICE_ACCOUNT_JSON no es un JSON válido: {e}")
     else:
-        raise ValueError("No se encontraron credenciales de Google Cloud. Configure GOOGLE_SERVICE_ACCOUNT_JSON")
+        raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON debe contener el JSON completo de las credenciales")
 
+# Inicializar cliente de Google Sheets
 creds = load_google_credentials()
 client = gspread.authorize(creds)
 
 SHEET_ID = os.getenv("SHEET_ID")
+if not SHEET_ID:
+    raise ValueError("SHEET_ID es obligatorio")
+
 SHEET_TAB = os.getenv("SHEET_TAB", "directory")
 
 def normalize_specialty_search(specialty: str) -> List[str]:

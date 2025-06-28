@@ -6,6 +6,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
+from twilio.request_validator import RequestValidator
 
 # Cargar variables de entorno
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -22,7 +23,7 @@ TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER")  # Ej: "whatsapp:+1
 twilio_client = None
 if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
     twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-    logger.info("✅ Cliente de Twilio inicializado correctamente")
+    logger.info("✅ Cliente de Twilio inicializado")
 else:
     logger.warning("⚠️ Credenciales de Twilio no configuradas")
 
@@ -33,16 +34,7 @@ def is_twilio_configured() -> bool:
 
 
 async def send_twilio_whatsapp_message(to_number: str, message: str) -> bool:
-    """
-    Envía un mensaje de WhatsApp usando Twilio.
-    
-    Args:
-        to_number: Número de teléfono del destinatario (formato: +1234567890)
-        message: Texto del mensaje a enviar
-        
-    Returns:
-        bool: True si el mensaje se envió correctamente, False en caso contrario
-    """
+    """Envía un mensaje de WhatsApp usando Twilio."""
     if not is_twilio_configured():
         logger.error("❌ Twilio no está configurado correctamente")
         return False
@@ -68,50 +60,21 @@ async def send_twilio_whatsapp_message(to_number: str, message: str) -> bool:
 
 
 def create_twilio_response(message: str) -> str:
-    """
-    Crea una respuesta TwiML para Twilio.
-    
-    Args:
-        message: Texto del mensaje de respuesta
-        
-    Returns:
-        str: Respuesta TwiML formateada
-    """
+    """Crea una respuesta TwiML para Twilio."""
     response = MessagingResponse()
-    response.message(message[:1600])  # Límite de caracteres de Twilio
+    response.message(message[:1600])
     return str(response)
 
 
 def validate_twilio_webhook(request_url: str, signature: str, params: dict) -> bool:
-    """
-    Valida que el webhook viene realmente de Twilio.
-    
-    Args:
-        request_url: URL del webhook
-        signature: Firma X-Twilio-Signature del header
-        params: Parámetros del webhook
-        
-    Returns:
-        bool: True si la firma es válida
-    """
+    """Valida que el webhook viene realmente de Twilio."""
     if not TWILIO_AUTH_TOKEN:
-        logger.warning("⚠️ No se puede validar webhook: TWILIO_AUTH_TOKEN no configurado")
-        return True  # En desarrollo, permitir sin validación
+        logger.error("❌ No se puede validar webhook: TWILIO_AUTH_TOKEN no configurado")
+        return False
     
     try:
-        from twilio.request_validator import RequestValidator
         validator = RequestValidator(TWILIO_AUTH_TOKEN)
         return validator.validate(request_url, params, signature)
     except Exception as e:
         logger.error(f"❌ Error validando webhook de Twilio: {str(e)}")
-        return False
-
-
-# Función helper para logging de configuración
-def log_twilio_config():
-    """Registra el estado de la configuración de Twilio."""
-    logger.info("🔧 Configuración de Twilio:")
-    logger.info(f"   ACCOUNT_SID: {'✅ Configurado' if TWILIO_ACCOUNT_SID else '❌ No configurado'}")
-    logger.info(f"   AUTH_TOKEN: {'✅ Configurado' if TWILIO_AUTH_TOKEN else '❌ No configurado'}")
-    logger.info(f"   WHATSAPP_NUMBER: {TWILIO_WHATSAPP_NUMBER or '❌ No configurado'}")
-    logger.info(f"   Cliente inicializado: {'✅ Sí' if twilio_client else '❌ No'}") 
+        return False 

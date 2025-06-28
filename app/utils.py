@@ -16,17 +16,15 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 memory_fallback = {}
 
 def get_redis_client():
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    logger.info(f"🔌 Intentando conectar a Redis: {redis_url[:20]}...")
+    """Obtiene cliente Redis o None si no está configurado."""
+    redis_url = os.getenv("REDIS_URL")
     
-    try:
-        # Si la URL no tiene esquema, agregarle redis://
-        if redis_url and not redis_url.startswith(('redis://', 'rediss://', 'unix://')):
-            logger.info(f"🔧 Agregando esquema redis:// a URL: {redis_url}")
-            redis_url = f"redis://{redis_url}"
+    if not redis_url:
+        logger.info("🔄 Redis no configurado, usando memoria en RAM")
+        return None
         
+    try:
         client = Redis.from_url(redis_url)
-        # Probar conexión
         client.ping()
         logger.info("✅ Redis conectado exitosamente")
         return client
@@ -36,7 +34,9 @@ def get_redis_client():
         logger.info("🔄 Usando memoria en RAM como fallback")
         return None
 
+# Inicializar Redis
 redis_client = get_redis_client()
+logger.info(f"💾 Sistema de memoria: {'Redis' if redis_client else 'RAM (fallback)'}")
 
 
 def extract_text_from_event(event: Dict[str, Any]) -> str | None:
