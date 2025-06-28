@@ -15,8 +15,15 @@ logger = logging.getLogger(__name__)
 # Cargar variables de entorno
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Configurar OpenAI con validación
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    logger.error("❌ OPENAI_API_KEY no está configurado!")
+    raise ValueError("OPENAI_API_KEY es obligatorio")
+
+openai.api_key = OPENAI_API_KEY
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+logger.info(f"🤖 OpenAI configurado con modelo: {MODEL}")
 
 SYSTEM_PROMPT = Path(__file__).parent / "prompts" / "system_prompt.txt"
 SYSTEM_TEXT = SYSTEM_PROMPT.read_text(encoding='utf-8')
