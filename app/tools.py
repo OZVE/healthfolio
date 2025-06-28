@@ -217,6 +217,7 @@ def normalize_city_search(city: str) -> List[str]:
 def normalize_availability_search(availability: str) -> List[str]:
     """
     Normaliza la búsqueda de disponibilidad para encontrar variaciones de días y horarios.
+    Maneja abreviaciones específicas del Google Sheet como "L a V", "Sáb y Dom", etc.
     """
     availability_lower = availability.lower().strip()
     
@@ -225,29 +226,29 @@ def normalize_availability_search(availability: str) -> List[str]:
     
     # Mapeo de días de la semana y horarios comunes
     availability_mappings = {
-        # Días de la semana
-        "lunes": ["lunes", "monday", "lun"],
-        "martes": ["martes", "tuesday", "mar"],
-        "miércoles": ["miércoles", "miercoles", "wednesday", "mié", "mie"],
-        "miercoles": ["miércoles", "miercoles", "wednesday", "mié", "mie"],
-        "jueves": ["jueves", "thursday", "jue"],
-        "viernes": ["viernes", "friday", "vie"],
-        "sábado": ["sábado", "sabado", "saturday", "sáb", "sab"],
-        "sabado": ["sábado", "sabado", "saturday", "sáb", "sab"],
-        "domingo": ["domingo", "sunday", "dom"],
+        # Días individuales
+        "lunes": ["lunes", "monday", "lun", "l", "l a v", "lunes a viernes", "entre semana", "semana"],
+        "martes": ["martes", "tuesday", "mar", "l a v", "lunes a viernes", "entre semana", "semana"],
+        "miércoles": ["miércoles", "miercoles", "wednesday", "mié", "mie", "l a v", "lunes a viernes", "entre semana", "semana"],
+        "miercoles": ["miércoles", "miercoles", "wednesday", "mié", "mie", "l a v", "lunes a viernes", "entre semana", "semana"],
+        "jueves": ["jueves", "thursday", "jue", "l a v", "lunes a viernes", "entre semana", "semana"],
+        "viernes": ["viernes", "friday", "vie", "v", "l a v", "lunes a viernes", "entre semana", "semana"],
+        "sábado": ["sábado", "sabado", "saturday", "sáb", "sab", "sáb y dom", "sabado y domingo", "fin de semana", "fines de semana", "weekend"],
+        "sabado": ["sábado", "sabado", "saturday", "sáb", "sab", "sáb y dom", "sabado y domingo", "fin de semana", "fines de semana", "weekend"],
+        "domingo": ["domingo", "sunday", "dom", "sáb y dom", "sabado y domingo", "fin de semana", "fines de semana", "weekend"],
         
-        # Grupos de días
-        "fin de semana": ["fin de semana", "fines de semana", "weekend", "sábado", "sabado", "domingo"],
-        "fines de semana": ["fin de semana", "fines de semana", "weekend", "sábado", "sabado", "domingo"],
-        "weekend": ["fin de semana", "fines de semana", "weekend", "sábado", "sabado", "domingo"],
-        "entre semana": ["lunes", "martes", "miércoles", "miercoles", "jueves", "viernes"],
-        "semana": ["lunes", "martes", "miércoles", "miercoles", "jueves", "viernes"],
+        # Grupos de días (formatos del Google Sheet)
+        "fin de semana": ["fin de semana", "fines de semana", "weekend", "sáb y dom", "sabado y domingo", "sábado", "sabado", "domingo"],
+        "fines de semana": ["fin de semana", "fines de semana", "weekend", "sáb y dom", "sabado y domingo", "sábado", "sabado", "domingo"],
+        "weekend": ["fin de semana", "fines de semana", "weekend", "sáb y dom", "sabado y domingo", "sábado", "sabado", "domingo"],
+        "entre semana": ["l a v", "lunes a viernes", "entre semana", "semana", "lunes", "martes", "miércoles", "miercoles", "jueves", "viernes"],
+        "semana": ["l a v", "lunes a viernes", "entre semana", "semana", "lunes", "martes", "miércoles", "miercoles", "jueves", "viernes"],
         
         # Horarios
-        "mañana": ["mañana", "morning", "am", "matutino"],
-        "tarde": ["tarde", "afternoon", "pm", "vespertino"],
-        "noche": ["noche", "evening", "night", "nocturno"],
-        "madrugada": ["madrugada", "early morning", "dawn"],
+        "mañana": ["mañana", "morning", "am", "matutino", "8:00", "9:00", "10:00", "11:00"],
+        "tarde": ["tarde", "afternoon", "pm", "vespertino", "14:00", "15:00", "16:00", "17:00", "18:00"],
+        "noche": ["noche", "evening", "night", "nocturno", "19:00", "20:00", "21:00", "22:00"],
+        "madrugada": ["madrugada", "early morning", "dawn", "6:00", "7:00"],
         
         # Urgencias
         "urgencia": ["urgencia", "emergency", "24 horas", "24/7", "siempre"],
@@ -256,8 +257,34 @@ def normalize_availability_search(availability: str) -> List[str]:
         "24/7": ["urgencia", "emergency", "24 horas", "24/7", "siempre"],
     }
     
-    if availability_lower in availability_mappings:
-        variations.extend(availability_mappings[availability_lower])
+    # Buscar coincidencias en el mapeo
+    for term, mappings in availability_mappings.items():
+        if term in availability_lower:
+            variations.extend(mappings)
+    
+    # Mapeo inverso: si el usuario busca un día que está en "L a V", debe encontrar "L a V"
+    reverse_mappings = {
+        # Si buscan días individuales de semana, también buscar "L a V"
+        "lunes": ["l a v", "lunes a viernes"],
+        "martes": ["l a v", "lunes a viernes"], 
+        "miércoles": ["l a v", "lunes a viernes"],
+        "miercoles": ["l a v", "lunes a viernes"],
+        "jueves": ["l a v", "lunes a viernes"],
+        "viernes": ["l a v", "lunes a viernes"],
+        
+        # Si buscan días de fin de semana, también buscar "Sáb y Dom"
+        "sábado": ["sáb y dom"],
+        "sabado": ["sáb y dom"],
+        "domingo": ["sáb y dom"],
+        "fin de semana": ["sáb y dom"],
+        "fines de semana": ["sáb y dom"],
+        "weekend": ["sáb y dom"],
+    }
+    
+    # Aplicar mapeo inverso
+    for user_term, sheet_terms in reverse_mappings.items():
+        if user_term in availability_lower:
+            variations.extend(sheet_terms)
     
     # Remover duplicados y mantener orden
     unique_variations = []
