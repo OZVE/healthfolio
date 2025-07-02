@@ -2,7 +2,7 @@ import logging
 import os
 import json
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Any
 import gspread
 from dotenv import load_dotenv
 from google.oauth2.service_account import Credentials
@@ -339,14 +339,19 @@ def find_professionals(specialty: str, city: str, availability: str = None) -> L
             coverage_area_text = str(r.get("coverage_area", "")).lower()
             city_match = any(term in coverage_area_text for term in city_terms)
             
-            # Buscar disponibilidad si se especificó
+            # Buscar disponibilidad si se especificó (en availability_days y availability_hours)
             availability_match = True  # Por defecto True si no se especifica availability
             if availability:
-                availability_text = str(r.get("availability", "")).lower()
-                availability_match = any(term in availability_text for term in availability_terms)
+                availability_days_text = str(r.get("availability_days", "")).lower()
+                availability_hours_text = str(r.get("availability_hours", "")).lower()
+                
+                # Buscar en ambos campos de disponibilidad
+                days_match = any(term in availability_days_text for term in availability_terms)
+                hours_match = any(term in availability_hours_text for term in availability_terms)
+                availability_match = days_match or hours_match
                 
                 if not availability_match:
-                    logger.info(f"🕐 No match de disponibilidad en fila {i+1}: '{availability_text}' no contiene ninguno de {availability_terms}")
+                    logger.info(f"🕐 No match de disponibilidad en fila {i+1}: días '{availability_days_text}' y horas '{availability_hours_text}' no contienen ninguno de {availability_terms}")
             
             if professional_match and city_match and availability_match:
                 logger.info(f"✅ Match completo encontrado en fila {i+1}: {r}")
@@ -356,7 +361,10 @@ def find_professionals(specialty: str, city: str, availability: str = None) -> L
                     logger.info(f"✅ Title match: '{title_text}' contiene alguno de {specialty_terms}")
                 logger.info(f"✅ City match: '{coverage_area_text}' contiene alguno de {city_terms}")
                 if availability:
-                    logger.info(f"✅ Availability match: '{availability_text}' contiene alguno de {availability_terms}")
+                    if days_match:
+                        logger.info(f"✅ Availability days match: '{availability_days_text}' contiene alguno de {availability_terms}")
+                    if hours_match:
+                        logger.info(f"✅ Availability hours match: '{availability_hours_text}' contiene alguno de {availability_terms}")
                 matches.append(r)
             elif professional_match and city_match:
                 logger.info(f"🔍 Professional y city match (pero no availability) en fila {i+1}: {r}")
@@ -387,24 +395,35 @@ def find_professional_by_name(name: str) -> Dict:
             professional_name = str(r.get("name", "")).lower()
             if name.lower() in professional_name or professional_name in name.lower():
                 # Extraer información específica del profesional
-                availability = r.get("availability", "No especificada")
+                availability_days = r.get("availability_days", "No especificado")
+                availability_hours = r.get("availability_hours", "No especificado")
                 specialty = r.get("specialty", "No especificada")
                 title = r.get("title", "No especificado")
                 coverage_area = r.get("coverage_area", "No especificada")
+                work_region = r.get("work_region", "No especificada")
+                age_group = r.get("age_group", "No especificado")
+                sis_number = r.get("sis_number", "No especificado")
                 
                 logger.info(f"✅ Profesional encontrado en fila {i+1}:")
                 logger.info(f"   📋 Nombre: {r.get('name', 'N/A')}")
+                logger.info(f"   🆔 Número SIS: {sis_number}")
                 logger.info(f"   🏥 Especialidad: {specialty}")
                 logger.info(f"   🎓 Título: {title}")
+                logger.info(f"   🌍 Región de trabajo: {work_region}")
                 logger.info(f"   📍 Área de cobertura: {coverage_area}")
-                logger.info(f"   📅 Disponibilidad: {availability}")
+                logger.info(f"   👥 Grupo etario: {age_group}")
+                logger.info(f"   📅 Días disponibles: {availability_days}")
+                logger.info(f"   🕐 Horarios: {availability_hours}")
                 logger.info(f"   📞 Contacto: {r.get('phone', 'N/A')}")
                 logger.info(f"   📧 Email: {r.get('email', 'N/A')}")
                 
-                # Asegurar que availability esté incluida en el resultado
-                if 'availability' not in r:
-                    logger.warning(f"⚠️ Columna 'availability' no encontrada en el registro")
-                    r['availability'] = "No especificada"
+                # Asegurar que los campos de disponibilidad estén incluidos en el resultado
+                if 'availability_days' not in r:
+                    logger.warning(f"⚠️ Columna 'availability_days' no encontrada en el registro")
+                    r['availability_days'] = "No especificado"
+                if 'availability_hours' not in r:
+                    logger.warning(f"⚠️ Columna 'availability_hours' no encontrada en el registro")
+                    r['availability_hours'] = "No especificado"
                 
                 return r
         
@@ -414,3 +433,177 @@ def find_professional_by_name(name: str) -> Dict:
     except Exception as e:
         logger.error(f"❌ Error buscando profesional por nombre: {str(e)}")
         return {}
+
+
+def get_all_professionals_data() -> List[Dict]:
+    """
+    Devuelve todos los datos de profesionales de la base de datos.
+    Permite al agente tener acceso completo a toda la información disponible.
+    """
+    logger.info(f"📊 Obteniendo todos los datos de profesionales desde Google Sheet")
+    
+    try:
+        sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_TAB)
+        logger.info(f"✅ Conexión exitosa a Google Sheet")
+        
+        rows = sheet.get_all_records()
+        logger.info(f"📊 Total de registros obtenidos: {len(rows)}")
+        
+        if len(rows) > 0:
+            logger.info(f"📊 Columnas disponibles: {list(rows[0].keys())}")
+            logger.info(f"📊 Muestra de datos (primer registro): {rows[0]}")
+        
+        return rows
+        
+    except Exception as e:
+        logger.error(f"❌ Error accediendo a Google Sheet: {str(e)}")
+        return []
+
+
+def search_professionals_flexible(search_query: str, search_criteria: Dict[str, str] = None) -> List[Dict]:
+    """
+    Búsqueda flexible de profesionales que permite al agente determinar los criterios de búsqueda.
+    
+    Args:
+        search_query: Consulta de búsqueda en lenguaje natural
+        search_criteria: Diccionario opcional con criterios específicos de búsqueda
+                        Puede incluir cualquier combinación de: name, sis_number, work_region,
+                        coverage_area, title, specialty, age_group, phone, email, 
+                        availability_days, availability_hours, etc.
+    
+    Returns:
+        Lista de profesionales que coinciden con los criterios
+    """
+    logger.info(f"🔍 Búsqueda flexible con query: '{search_query}'")
+    if search_criteria:
+        logger.info(f"🔍 Criterios específicos: {search_criteria}")
+    
+    try:
+        sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_TAB)
+        rows = sheet.get_all_records()
+        logger.info(f"📊 Buscando en {len(rows)} registros...")
+        
+        if len(rows) > 0:
+            logger.info(f"📊 Columnas disponibles para búsqueda: {list(rows[0].keys())}")
+        
+        matches = []
+        
+        # Si no se proporcionan criterios específicos, hacer búsqueda en todos los campos
+        if not search_criteria:
+            search_terms = search_query.lower().split()
+            logger.info(f"🔍 Búsqueda general con términos: {search_terms}")
+            
+            for i, record in enumerate(rows):
+                # Buscar en todos los campos de texto del registro
+                record_text = ""
+                for key, value in record.items():
+                    if isinstance(value, str):
+                        record_text += f" {value.lower()}"
+                
+                # Verificar si algún término de búsqueda está en el registro
+                match_found = any(term in record_text for term in search_terms)
+                
+                if match_found:
+                    logger.info(f"✅ Match encontrado en registro {i+1}: {record.get('name', 'N/A')}")
+                    matches.append(record)
+        
+        else:
+            # Búsqueda con criterios específicos
+            logger.info(f"🔍 Búsqueda con criterios específicos")
+            
+            for i, record in enumerate(rows):
+                match_found = True
+                
+                for criterion_key, criterion_value in search_criteria.items():
+                    if criterion_key in record:
+                        record_value = str(record[criterion_key]).lower()
+                        search_value = criterion_value.lower()
+                        
+                        # Aplicar normalización inteligente según el tipo de campo
+                        if criterion_key in ['specialty', 'title']:
+                            search_terms = normalize_specialty_search(criterion_value)
+                            field_match = any(term in record_value for term in search_terms)
+                        elif criterion_key in ['coverage_area', 'work_region']:
+                            search_terms = normalize_city_search(criterion_value)
+                            field_match = any(term in record_value for term in search_terms)
+                        elif criterion_key in ['availability_days', 'availability_hours']:
+                            search_terms = normalize_availability_search(criterion_value)
+                            field_match = any(term in record_value for term in search_terms)
+                        else:
+                            # Búsqueda simple para otros campos (name, sis_number, age_group, phone, email)
+                            field_match = search_value in record_value
+                        
+                        if not field_match:
+                            match_found = False
+                            break
+                    else:
+                        logger.warning(f"⚠️ Campo '{criterion_key}' no existe en el registro")
+                        match_found = False
+                        break
+                
+                if match_found:
+                    logger.info(f"✅ Match con criterios específicos en registro {i+1}: {record.get('name', 'N/A')}")
+                    matches.append(record)
+        
+        logger.info(f"📋 Total matches encontrados: {len(matches)}")
+        return matches
+        
+    except Exception as e:
+        logger.error(f"❌ Error en búsqueda flexible: {str(e)}")
+        return []
+
+
+def get_database_schema() -> Dict[str, Any]:
+    """
+    Devuelve información sobre la estructura de la base de datos de profesionales.
+    Incluye nombres de columnas, tipos de datos y ejemplos.
+    """
+    logger.info(f"📋 Obteniendo esquema de la base de datos")
+    
+    try:
+        sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_TAB)
+        rows = sheet.get_all_records()
+        
+        if len(rows) == 0:
+            return {"error": "No hay datos disponibles"}
+        
+        # Obtener información del esquema
+        schema_info = {
+            "total_records": len(rows),
+            "columns": list(rows[0].keys()),
+            "sample_data": rows[0] if len(rows) > 0 else {},
+            "column_descriptions": {
+                "name": "Nombre completo del profesional de salud",
+                "sis_number": "Número identificador en el sistema de salud",
+                "work_region": "Región donde trabaja el profesional",
+                "coverage_area": "Áreas específicas o ciudades donde brinda servicios",
+                "title": "Título profesional (ej: Médico, Enfermera, Kinesiólogo, Nutricionista, TENS, etc.)",
+                "specialty": "Especialidad médica específica (ej: Cardiología, Pediatría, Geriatría, etc.)",
+                "age_group": "Grupo etario que atiende (ej: Adultos, Niños, Adultos Mayores, etc.)",
+                "phone": "Número de teléfono de contacto",
+                "email": "Correo electrónico de contacto",
+                "availability_days": "Días de la semana en que está disponible",
+                "availability_hours": "Horarios de atención específicos"
+            }
+        }
+        
+        # Obtener valores únicos para campos categóricos
+        unique_values = {}
+        categorical_fields = ['title', 'specialty', 'work_region', 'age_group']
+        
+        for field in categorical_fields:
+            if field in rows[0]:
+                values = set()
+                for record in rows:
+                    if record.get(field):
+                        values.add(str(record[field]))
+                unique_values[field] = sorted(list(values))
+        
+        schema_info["unique_values"] = unique_values
+        
+        logger.info(f"📋 Esquema obtenido: {len(schema_info['columns'])} columnas, {schema_info['total_records']} registros")
+        return schema_info
+        
+    except Exception as e:
+        logger.error(f"❌ Error obteniendo esquema: {str(e)}")
+        return {"error": f"Error accediendo a la base de datos: {str(e)}"}
