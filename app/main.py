@@ -205,30 +205,49 @@ async def send_whatsapp_message(to_number: str, text: str):
 
 async def send_evolution_message(to_number: str, text: str):
     """Envía mensaje usando Evolution API."""
-    if not (EVO_URL and API_KEY and INSTANCE_ID):
+    if not (EVO_URL and INSTANCE_ID):
         raise Exception("Evolution API not properly configured")
         
+    # Formatear número para Evolution API (agregar código de país si no está)
+    formatted_number = to_number
+    if not to_number.startswith("+"):
+        # Asumir código de país +54 para Argentina si no está presente
+        if len(to_number) == 11 and to_number.startswith("9"):
+            formatted_number = "+54" + to_number
+        elif len(to_number) == 10 and to_number.startswith("11"):
+            formatted_number = "+54" + to_number
+        else:
+            formatted_number = "+" + to_number
+    
     # Formato correcto según documentación oficial de Evolution API
     url = f"{EVO_URL}/message/sendText/{INSTANCE_ID}"
     logger.info(f"Sending message to Evolution API: {url}")
 
     # Payload correcto para Evolution API v2
     payload: Dict[str, Any] = {
-        "number": to_number,
+        "number": formatted_number,
         "text": text[:4096]
     }
 
-    # Headers correctos para Evolution API
+    # Headers correctos para Evolution API - Incluir API Key si está disponible
     headers = {
-        "Content-Type": "application/json",
-        "apikey": API_KEY
+        "Content-Type": "application/json"
     }
+    
+    # Agregar API Key si está configurado (para compatibilidad)
+    if API_KEY:
+        headers["apikey"] = API_KEY
+        logger.info("Using API Key for Evolution API authentication")
+    else:
+        logger.info("No API Key configured, using instance-only authentication")
 
     # Log del payload para debugging
     payload_log = {
-        "number": f"{to_number[:4]}***{to_number[-4:]}",
+        "original_number": to_number,
+        "formatted_number": formatted_number,
         "text_length": len(text),
-        "text_preview": text[:50] + "..." if len(text) > 50 else text
+        "text_preview": text[:50] + "..." if len(text) > 50 else text,
+        "instance_id": INSTANCE_ID
     }
     logger.info(f"Evolution API payload: {payload_log}")
 
@@ -243,8 +262,10 @@ async def send_evolution_message(to_number: str, text: str):
                     "status_code": r.status_code,
                     "response_text": r.text,
                     "url": url,
-                    "payload_number": to_number,
+                    "original_number": to_number,
+                    "formatted_number": formatted_number,
                     "payload_text_length": len(text),
+                    "instance_id": INSTANCE_ID,
                     "headers_sent": {k: v for k, v in headers.items() if k.lower() != 'apikey'}
                 }
                 logger.error(f"Evolution API error details: {error_details}")
@@ -252,11 +273,11 @@ async def send_evolution_message(to_number: str, text: str):
                 if r.status_code == 400:
                     raise Exception(f"Evolution API Bad Request (400): {r.text}")
                 elif r.status_code == 401:
-                    raise Exception(f"Evolution API Unauthorized (401): Check API key")
+                    raise Exception(f"Evolution API Unauthorized (401): Check instance connection or API key")
                 elif r.status_code == 403:
                     raise Exception(f"Evolution API Forbidden (403): Check permissions")
                 elif r.status_code == 404:
-                    raise Exception(f"Evolution API Not Found (404): Check instance ID")
+                    raise Exception(f"Evolution API Not Found (404): Check instance ID '{INSTANCE_ID}'")
                 else:
                     raise Exception(f"Evolution API error: {r.status_code} - {r.text}")
             else:
