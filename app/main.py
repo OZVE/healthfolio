@@ -46,9 +46,11 @@ API_KEY = os.getenv("EVOLUTION_API_KEY")
 INSTANCE_ID = os.getenv("EVOLUTION_INSTANCE_ID")
 WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "evolution").lower()
 
+# Headers mejorados para Evolution API
 HEADERS = {
     "Content-Type": "application/json",
-    "apikey": API_KEY,
+    "apikey": API_KEY,  # Este debería ser el API Key real, no el Instance ID
+    "Accept": "application/json"
 }
 
 logger.info(f"📱 Proveedor de WhatsApp: {WHATSAPP_PROVIDER}")
@@ -206,13 +208,20 @@ async def send_evolution_message(to_number: str, text: str):
     if not (EVO_URL and API_KEY and INSTANCE_ID):
         raise Exception("Evolution API not properly configured")
         
+    # Formato correcto según documentación oficial de Evolution API
     url = f"{EVO_URL}/message/sendText/{INSTANCE_ID}"
     logger.info(f"Sending message to Evolution API: {url}")
 
-    # Formato correcto para Evolution API
+    # Payload correcto para Evolution API v2
     payload: Dict[str, Any] = {
         "number": to_number,
         "text": text[:4096]
+    }
+
+    # Headers correctos para Evolution API
+    headers = {
+        "Content-Type": "application/json",
+        "apikey": API_KEY
     }
 
     # Log del payload para debugging
@@ -223,30 +232,46 @@ async def send_evolution_message(to_number: str, text: str):
     }
     logger.info(f"Evolution API payload: {payload_log}")
 
-    async with httpx.AsyncClient(timeout=15) as client:
-        r = await client.post(url, headers=HEADERS, json=payload)
-        
-        logger.info(f"Evolution API response: Status {r.status_code}")
-        
-        if r.status_code >= 400:
-            error_details = {
-                "status_code": r.status_code,
-                "response_text": r.text,
-                "url": url,
-                "payload_number": to_number,
-                "payload_text_length": len(text)
-            }
-            logger.error(f"Evolution API error details: {error_details}")
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(url, headers=headers, json=payload)
             
-            if r.status_code == 400:
-                raise Exception(f"Evolution API Bad Request (400): {r.text}")
-            elif r.status_code == 401:
-                raise Exception(f"Evolution API Unauthorized (401): Check API key")
-            elif r.status_code == 403:
-                raise Exception(f"Evolution API Forbidden (403): Check permissions")
-            elif r.status_code == 404:
-                raise Exception(f"Evolution API Not Found (404): Check instance ID")
+            logger.info(f"Evolution API response: Status {r.status_code}")
+            
+            if r.status_code >= 400:
+                error_details = {
+                    "status_code": r.status_code,
+                    "response_text": r.text,
+                    "url": url,
+                    "payload_number": to_number,
+                    "payload_text_length": len(text),
+                    "headers_sent": {k: v for k, v in headers.items() if k.lower() != 'apikey'}
+                }
+                logger.error(f"Evolution API error details: {error_details}")
+                
+                if r.status_code == 400:
+                    raise Exception(f"Evolution API Bad Request (400): {r.text}")
+                elif r.status_code == 401:
+                    raise Exception(f"Evolution API Unauthorized (401): Check API key")
+                elif r.status_code == 403:
+                    raise Exception(f"Evolution API Forbidden (403): Check permissions")
+                elif r.status_code == 404:
+                    raise Exception(f"Evolution API Not Found (404): Check instance ID")
+                else:
+                    raise Exception(f"Evolution API error: {r.status_code} - {r.text}")
             else:
-                raise Exception(f"Evolution API error: {r.status_code} - {r.text}")
+                logger.info(f"✅ Message sent successfully via Evolution API!")
+                logger.info(f"Response: {r.text}")
+                
+    except httpx.TimeoutException:
+        logger.error("Evolution API request timed out")
+        raise Exception("Evolution API request timed out")
+    except httpx.RequestError as e:
+        logger.error(f"Evolution API request error: {e}")
+        raise Exception(f"Evolution API connection error: {e}")
+    except Exception as e:
+        if "Evolution API" in str(e):
+            raise  # Re-raise our custom exceptions
         else:
-            logger.info(f"Message sent successfully via Evolution API. Response: {r.text}")
+            logger.error(f"Unexpected error in send_evolution_message: {e}", exc_info=True)
+            raise Exception(f"Unexpected error sending message: {e}")
