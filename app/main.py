@@ -227,11 +227,18 @@ async def send_evolution_message(to_number: str, text: str, webhook_apikey: str 
         else:
             formatted_number = "+" + to_number
     
-    # Endpoints correctos según documentación oficial de Evolution API v2
+    # Endpoints comunes de Evolution API - probar diferentes variaciones
     endpoints_to_try = [
         f"{EVO_URL}/message/sendText/{INSTANCE_ID}",
         f"{EVO_URL}/v1/message/sendText/{INSTANCE_ID}",
-        f"{EVO_URL}/api/message/sendText/{INSTANCE_ID}"
+        f"{EVO_URL}/api/message/sendText/{INSTANCE_ID}",
+        f"{EVO_URL}/message/text/{INSTANCE_ID}",
+        f"{EVO_URL}/sendText/{INSTANCE_ID}",
+        f"{EVO_URL}/send-text/{INSTANCE_ID}",
+        f"{EVO_URL}/chat/send/{INSTANCE_ID}",
+        f"{EVO_URL}/instance/sendText/{INSTANCE_ID}",
+        f"{EVO_URL}/instance/{INSTANCE_ID}/sendText",
+        f"{EVO_URL}/instance/{INSTANCE_ID}/message/sendText"
     ]
     
     # Headers correctos para Evolution API v2
@@ -276,6 +283,30 @@ async def send_evolution_message(to_number: str, text: str, webhook_apikey: str 
     }
     logger.info(f"Evolution API payload: {payload_log}")
 
+    # Primero probar endpoints de información para ver qué está disponible
+    info_endpoints = [
+        f"{EVO_URL}/instance/info/{INSTANCE_ID}",
+        f"{EVO_URL}/instance/{INSTANCE_ID}/info",
+        f"{EVO_URL}/api/instance/{INSTANCE_ID}",
+        f"{EVO_URL}/docs",
+        f"{EVO_URL}/swagger",
+        f"{EVO_URL}/api-docs"
+    ]
+    
+    for info_url in info_endpoints:
+        try:
+            logger.info(f"Testing info endpoint: {info_url}")
+            
+            async with httpx.AsyncClient(timeout=10) as client:
+                info_response = await client.get(info_url, headers=headers)
+                logger.info(f"Info endpoint {info_url}: {info_response.status_code} - {info_response.text[:200]}")
+                
+                if info_response.status_code == 200:
+                    logger.info(f"✅ Found working info endpoint: {info_url}")
+                    break
+        except Exception as e:
+            logger.warning(f"Info endpoint {info_url} failed: {e}")
+    
     # Probar diferentes endpoints
     last_error = None
     
