@@ -242,6 +242,7 @@ async def send_evolution_message(to_number: str, text: str):
     if EVOLUTION_API_KEY:
         headers["apikey"] = EVOLUTION_API_KEY
         logger.info("Using API Key for Evolution API authentication")
+        logger.info(f"Headers with API key: {list(headers.keys())}")
     else:
         logger.info("No API Key configured, using instance-only authentication")
 
@@ -255,11 +256,18 @@ async def send_evolution_message(to_number: str, text: str):
     }
     logger.info(f"Evolution API payload: {payload_log}")
 
+    # Log completo de la petición
+    logger.info(f"Full request details:")
+    logger.info(f"  URL: {url}")
+    logger.info(f"  Headers: {headers}")
+    logger.info(f"  Payload: {payload}")
+
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.post(url, headers=headers, json=payload)
             
             logger.info(f"Evolution API response: Status {r.status_code}")
+            logger.info(f"Response headers: {dict(r.headers)}")
             
             if r.status_code >= 400:
                 error_details = {
@@ -270,7 +278,9 @@ async def send_evolution_message(to_number: str, text: str):
                     "formatted_number": formatted_number,
                     "payload_text_length": len(text),
                     "instance_id": INSTANCE_ID,
-                    "headers_sent": {k: v for k, v in headers.items() if k.lower() != 'apikey'}
+                    "headers_sent": {k: v for k, v in headers.items() if k.lower() != 'apikey'},
+                    "request_headers_full": headers,
+                    "request_payload": payload
                 }
                 logger.error(f"Evolution API error details: {error_details}")
                 
