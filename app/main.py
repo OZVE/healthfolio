@@ -115,6 +115,13 @@ async def webhook_evolution(request: Request):
     try:
         event_json = await request.json()
         logger.info(f"Received Evolution webhook: {event_json}")
+        
+        # Debug: Verificar API Key del webhook vs configuración
+        webhook_apikey = event_json.get('apikey', '')
+        if webhook_apikey:
+            logger.info(f"Webhook API Key: {webhook_apikey[:8]}...{webhook_apikey[-4:]}")
+            logger.info(f"Config API Key: {EVOLUTION_API_KEY[:8] if EVOLUTION_API_KEY else 'None'}...{EVOLUTION_API_KEY[-4:] if EVOLUTION_API_KEY else ''}")
+            logger.info(f"API Keys match: {webhook_apikey == EVOLUTION_API_KEY}")
 
         # Solo reaccionamos a MESSAGES_UPSERT
         event_name = event_json.get("event", "").upper().replace(".", "_")
@@ -133,7 +140,9 @@ async def webhook_evolution(request: Request):
         reply_text = process(user_text, chat_id)
         logger.info(f"Generated reply: {reply_text[:100]}...")
         
-        await send_whatsapp_message(chat_id, reply_text)
+        # Usar el API Key del webhook si está disponible
+        webhook_apikey = event_json.get('apikey', '')
+        await send_whatsapp_message(chat_id, reply_text, webhook_apikey)
         logger.info("Message sent successfully")
 
         return {"status": "ok"}
@@ -192,17 +201,17 @@ async def webhook_twilio(
         return PlainTextResponse("Error", status_code=500)
 
 
-async def send_whatsapp_message(to_number: str, text: str):
+async def send_whatsapp_message(to_number: str, text: str, webhook_apikey: str = None):
     """Envía mensaje usando el proveedor configurado."""
     if WHATSAPP_PROVIDER == "twilio":
         success = await send_twilio_whatsapp_message(to_number, text)
         if not success:
             raise Exception("Failed to send message via Twilio")
     else:  # evolution
-        await send_evolution_message(to_number, text)
+        await send_evolution_message(to_number, text, webhook_apikey)
 
 
-async def send_evolution_message(to_number: str, text: str):
+async def send_evolution_message(to_number: str, text: str, webhook_apikey: str = None):
     """Envía mensaje usando Evolution API."""
     if not (EVO_URL and INSTANCE_ID):
         raise Exception("Evolution API not properly configured")
@@ -231,17 +240,21 @@ async def send_evolution_message(to_number: str, text: str):
         "Accept": "application/json"
     }
     
-    # Debug: Verificar si API_KEY está configurado
-    logger.info(f"API_KEY configured: {bool(EVOLUTION_API_KEY)}")
-    logger.info(f"API_KEY length: {len(EVOLUTION_API_KEY) if EVOLUTION_API_KEY else 0}")
+    # Usar API Key del webhook si está disponible, sino usar el configurado
+    api_key_to_use = webhook_apikey if webhook_apikey else EVOLUTION_API_KEY
+    
+    # Debug: Verificar API Key a usar
+    logger.info(f"Webhook API Key available: {bool(webhook_apikey)}")
+    logger.info(f"Config API Key available: {bool(EVOLUTION_API_KEY)}")
+    logger.info(f"API Key to use: {api_key_to_use[:8] if api_key_to_use else 'None'}...{api_key_to_use[-4:] if api_key_to_use else ''}")
     
     # Agregar Authorization header con Bearer token (formato correcto para Evolution API)
-    if EVOLUTION_API_KEY:
-        headers["Authorization"] = f"Bearer {EVOLUTION_API_KEY}"
+    if api_key_to_use:
+        headers["Authorization"] = f"Bearer {api_key_to_use}"
         logger.info("Using Bearer token for Evolution API authentication")
         logger.info(f"Headers with Authorization: {list(headers.keys())}")
     else:
-        logger.info("No API Key configured, using instance-only authentication")
+        logger.info("No API Key available, using instance-only authentication")
 
     # Payload correcto para Evolution API v2 según documentación oficial
     payload: Dict[str, Any] = {
