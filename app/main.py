@@ -234,6 +234,10 @@ async def send_evolution_message(to_number: str, text: str):
         "Content-Type": "application/json"
     }
     
+    # Debug: Verificar si API_KEY está configurado
+    logger.info(f"API_KEY configured: {bool(API_KEY)}")
+    logger.info(f"API_KEY length: {len(API_KEY) if API_KEY else 0}")
+    
     # Agregar API Key si está configurado (para compatibilidad)
     if API_KEY:
         headers["apikey"] = API_KEY
