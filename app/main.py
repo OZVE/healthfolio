@@ -209,16 +209,44 @@ async def send_evolution_message(to_number: str, text: str):
     url = f"{EVO_URL}/message/sendText/{INSTANCE_ID}"
     logger.info(f"Sending message to Evolution API: {url}")
 
+    # Formato correcto para Evolution API
     payload: Dict[str, Any] = {
         "number": to_number,
-        "text": text[:4096],
-        "options": {"delay": 1200, "presence": "composing"},
+        "text": text[:4096]
     }
 
-    async with httpx.AsyncClient(timeout=10) as client:
+    # Log del payload para debugging
+    payload_log = {
+        "number": f"{to_number[:4]}***{to_number[-4:]}",
+        "text_length": len(text),
+        "text_preview": text[:50] + "..." if len(text) > 50 else text
+    }
+    logger.info(f"Evolution API payload: {payload_log}")
+
+    async with httpx.AsyncClient(timeout=15) as client:
         r = await client.post(url, headers=HEADERS, json=payload)
+        
+        logger.info(f"Evolution API response: Status {r.status_code}")
+        
         if r.status_code >= 400:
-            logger.error("Evolution send error %s %s", r.status_code, r.text)
-            raise Exception(f"Evolution API error: {r.status_code}")
+            error_details = {
+                "status_code": r.status_code,
+                "response_text": r.text,
+                "url": url,
+                "payload_number": to_number,
+                "payload_text_length": len(text)
+            }
+            logger.error(f"Evolution API error details: {error_details}")
+            
+            if r.status_code == 400:
+                raise Exception(f"Evolution API Bad Request (400): {r.text}")
+            elif r.status_code == 401:
+                raise Exception(f"Evolution API Unauthorized (401): Check API key")
+            elif r.status_code == 403:
+                raise Exception(f"Evolution API Forbidden (403): Check permissions")
+            elif r.status_code == 404:
+                raise Exception(f"Evolution API Not Found (404): Check instance ID")
+            else:
+                raise Exception(f"Evolution API error: {r.status_code} - {r.text}")
         else:
-            logger.info("Message sent successfully via Evolution API")
+            logger.info(f"Message sent successfully via Evolution API. Response: {r.text}")
