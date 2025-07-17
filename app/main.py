@@ -46,10 +46,9 @@ EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY")
 INSTANCE_ID = os.getenv("EVOLUTION_INSTANCE_ID")
 WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "evolution").lower()
 
-# Headers mejorados para Evolution API
+# Headers para Evolution API (se configuran dinámicamente en cada request)
 HEADERS = {
     "Content-Type": "application/json",
-    "apikey": EVOLUTION_API_KEY,  # Corregido: usar EVOLUTION_API_KEY
     "Accept": "application/json"
 }
 
@@ -219,36 +218,39 @@ async def send_evolution_message(to_number: str, text: str):
         else:
             formatted_number = "+" + to_number
     
-    # Formato correcto según documentación oficial de Evolution API
-    # Probar diferentes endpoints de Evolution API
+    # Endpoints correctos según documentación oficial de Evolution API v2
     endpoints_to_try = [
         f"{EVO_URL}/message/sendText/{INSTANCE_ID}",
-        f"{EVO_URL}/message/text/{INSTANCE_ID}",
-        f"{EVO_URL}/sendText/{INSTANCE_ID}",
-        f"{EVO_URL}/send-text/{INSTANCE_ID}"
+        f"{EVO_URL}/v1/message/sendText/{INSTANCE_ID}",
+        f"{EVO_URL}/api/message/sendText/{INSTANCE_ID}"
     ]
     
-    # Headers correctos para Evolution API - Incluir API Key si está disponible
+    # Headers correctos para Evolution API v2
     headers = {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json"
     }
     
     # Debug: Verificar si API_KEY está configurado
     logger.info(f"API_KEY configured: {bool(EVOLUTION_API_KEY)}")
     logger.info(f"API_KEY length: {len(EVOLUTION_API_KEY) if EVOLUTION_API_KEY else 0}")
     
-    # Agregar API Key si está configurado (para compatibilidad)
+    # Agregar Authorization header con Bearer token (formato correcto para Evolution API)
     if EVOLUTION_API_KEY:
-        headers["apikey"] = EVOLUTION_API_KEY
-        logger.info("Using API Key for Evolution API authentication")
-        logger.info(f"Headers with API key: {list(headers.keys())}")
+        headers["Authorization"] = f"Bearer {EVOLUTION_API_KEY}"
+        logger.info("Using Bearer token for Evolution API authentication")
+        logger.info(f"Headers with Authorization: {list(headers.keys())}")
     else:
         logger.info("No API Key configured, using instance-only authentication")
 
-    # Payload correcto para Evolution API v2
+    # Payload correcto para Evolution API v2 según documentación oficial
     payload: Dict[str, Any] = {
         "number": formatted_number,
-        "text": text[:4096]
+        "text": text[:4096],
+        "options": {
+            "delay": 1200,
+            "presence": "composing"
+        }
     }
 
     # Log del payload para debugging
@@ -302,7 +304,7 @@ async def send_evolution_message(to_number: str, text: str):
         "formatted_number": formatted_number,
         "payload_text_length": len(text),
         "instance_id": INSTANCE_ID,
-        "headers_sent": {k: v for k, v in headers.items() if k.lower() != 'apikey'},
+        "headers_sent": {k: v for k, v in headers.items() if k.lower() != 'authorization'},
         "request_headers_full": headers,
         "request_payload": payload
     }
