@@ -238,7 +238,12 @@ async def send_evolution_message(to_number: str, text: str, webhook_apikey: str 
         f"{EVO_URL}/chat/send/{INSTANCE_ID}",
         f"{EVO_URL}/instance/sendText/{INSTANCE_ID}",
         f"{EVO_URL}/instance/{INSTANCE_ID}/sendText",
-        f"{EVO_URL}/instance/{INSTANCE_ID}/message/sendText"
+        f"{EVO_URL}/instance/{INSTANCE_ID}/message/sendText",
+        f"{EVO_URL}/message/send/{INSTANCE_ID}",
+        f"{EVO_URL}/send/{INSTANCE_ID}",
+        f"{EVO_URL}/chat/{INSTANCE_ID}/send",
+        f"{EVO_URL}/whatsapp/send/{INSTANCE_ID}",
+        f"{EVO_URL}/whatsapp/{INSTANCE_ID}/send"
     ]
     
     # Headers correctos para Evolution API v2
@@ -272,6 +277,12 @@ async def send_evolution_message(to_number: str, text: str, webhook_apikey: str 
             "presence": "composing"
         }
     }
+    
+    # Payload simple para endpoints que no aceptan options
+    simple_payload: Dict[str, Any] = {
+        "number": formatted_number,
+        "text": text[:4096]
+    }
 
     # Log del payload para debugging
     payload_log = {
@@ -285,12 +296,18 @@ async def send_evolution_message(to_number: str, text: str, webhook_apikey: str 
 
     # Primero probar endpoints de información para ver qué está disponible
     info_endpoints = [
+        f"{EVO_URL}/",
+        f"{EVO_URL}/health",
+        f"{EVO_URL}/status",
+        f"{EVO_URL}/ping",
         f"{EVO_URL}/instance/info/{INSTANCE_ID}",
         f"{EVO_URL}/instance/{INSTANCE_ID}/info",
         f"{EVO_URL}/api/instance/{INSTANCE_ID}",
         f"{EVO_URL}/docs",
         f"{EVO_URL}/swagger",
-        f"{EVO_URL}/api-docs"
+        f"{EVO_URL}/api-docs",
+        f"{EVO_URL}/openapi.json",
+        f"{EVO_URL}/api"
     ]
     
     for info_url in info_endpoints:
@@ -314,8 +331,8 @@ async def send_evolution_message(to_number: str, text: str, webhook_apikey: str 
         try:
             logger.info(f"Trying endpoint {endpoint_index + 1}: {url}")
             
-            # Log completo de la petición
-            logger.info(f"Full request details:")
+            # Probar primero con payload completo
+            logger.info(f"Testing with full payload (with options)")
             logger.info(f"  URL: {url}")
             logger.info(f"  Headers: {headers}")
             logger.info(f"  Payload: {payload}")
@@ -332,8 +349,22 @@ async def send_evolution_message(to_number: str, text: str, webhook_apikey: str 
                     logger.info(f"Response: {r.text}")
                     return  # Éxito, salir de la función
                 else:
-                    logger.warning(f"❌ Failed with endpoint {url}: {r.status_code} - {r.text}")
-                    last_error = r.text
+                    logger.warning(f"❌ Failed with full payload: {r.status_code} - {r.text}")
+                    
+                    # Si falla con payload completo, probar con payload simple
+                    logger.info(f"Trying with simple payload (without options)")
+                    logger.info(f"  Payload: {simple_payload}")
+                    
+                    r_simple = await client.post(url, headers=headers, json=simple_payload)
+                    
+                    if r_simple.status_code < 400:
+                        logger.info(f"✅ Message sent successfully with simple payload!")
+                        logger.info(f"Successful endpoint: {url}")
+                        logger.info(f"Response: {r_simple.text}")
+                        return  # Éxito, salir de la función
+                    else:
+                        logger.warning(f"❌ Failed with simple payload: {r_simple.status_code} - {r_simple.text}")
+                        last_error = r_simple.text
                     
         except Exception as e:
             logger.warning(f"Error with endpoint {url}: {e}")
