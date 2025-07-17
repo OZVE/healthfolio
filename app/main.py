@@ -42,14 +42,14 @@ EVO_URL = os.getenv("EVOLUTION_BASE_URL")
 if EVO_URL:
     EVO_URL = EVO_URL.rstrip("/")
 
-API_KEY = os.getenv("EVOLUTION_API_KEY")
+EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY")
 INSTANCE_ID = os.getenv("EVOLUTION_INSTANCE_ID")
 WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "evolution").lower()
 
 # Headers mejorados para Evolution API
 HEADERS = {
     "Content-Type": "application/json",
-    "apikey": API_KEY,  # Este debería ser el API Key real, no el Instance ID
+    "apikey": EVOLUTION_API_KEY,  # Corregido: usar EVOLUTION_API_KEY
     "Accept": "application/json"
 }
 
@@ -73,7 +73,7 @@ async def health_check():
         if WHATSAPP_PROVIDER == "twilio":
             whatsapp_configured = is_twilio_configured()
         else:  # evolution
-            whatsapp_configured = bool(EVO_URL and API_KEY and INSTANCE_ID)
+            whatsapp_configured = bool(EVO_URL and EVOLUTION_API_KEY and INSTANCE_ID)
         
         health_status = {
             "status": "healthy",
@@ -235,12 +235,12 @@ async def send_evolution_message(to_number: str, text: str):
     }
     
     # Debug: Verificar si API_KEY está configurado
-    logger.info(f"API_KEY configured: {bool(API_KEY)}")
-    logger.info(f"API_KEY length: {len(API_KEY) if API_KEY else 0}")
+    logger.info(f"API_KEY configured: {bool(EVOLUTION_API_KEY)}")
+    logger.info(f"API_KEY length: {len(EVOLUTION_API_KEY) if EVOLUTION_API_KEY else 0}")
     
     # Agregar API Key si está configurado (para compatibilidad)
-    if API_KEY:
-        headers["apikey"] = API_KEY
+    if EVOLUTION_API_KEY:
+        headers["apikey"] = EVOLUTION_API_KEY
         logger.info("Using API Key for Evolution API authentication")
     else:
         logger.info("No API Key configured, using instance-only authentication")
