@@ -220,15 +220,14 @@ async def send_evolution_message(to_number: str, text: str):
             formatted_number = "+" + to_number
     
     # Formato correcto según documentación oficial de Evolution API
-    url = f"{EVO_URL}/message/sendText/{INSTANCE_ID}"
-    logger.info(f"Sending message to Evolution API: {url}")
-
-    # Payload correcto para Evolution API v2
-    payload: Dict[str, Any] = {
-        "number": formatted_number,
-        "text": text[:4096]
-    }
-
+    # Probar diferentes endpoints de Evolution API
+    endpoints_to_try = [
+        f"{EVO_URL}/message/sendText/{INSTANCE_ID}",
+        f"{EVO_URL}/message/text/{INSTANCE_ID}",
+        f"{EVO_URL}/sendText/{INSTANCE_ID}",
+        f"{EVO_URL}/send-text/{INSTANCE_ID}"
+    ]
+    
     # Headers correctos para Evolution API - Incluir API Key si está disponible
     headers = {
         "Content-Type": "application/json"
@@ -246,6 +245,12 @@ async def send_evolution_message(to_number: str, text: str):
     else:
         logger.info("No API Key configured, using instance-only authentication")
 
+    # Payload correcto para Evolution API v2
+    payload: Dict[str, Any] = {
+        "number": formatted_number,
+        "text": text[:4096]
+    }
+
     # Log del payload para debugging
     payload_log = {
         "original_number": to_number,
@@ -256,57 +261,54 @@ async def send_evolution_message(to_number: str, text: str):
     }
     logger.info(f"Evolution API payload: {payload_log}")
 
-    # Log completo de la petición
-    logger.info(f"Full request details:")
-    logger.info(f"  URL: {url}")
-    logger.info(f"  Headers: {headers}")
-    logger.info(f"  Payload: {payload}")
+    # Probar diferentes endpoints
+    last_error = None
+    
+    for endpoint_index, url in enumerate(endpoints_to_try):
+        try:
+            logger.info(f"Trying endpoint {endpoint_index + 1}: {url}")
+            
+            # Log completo de la petición
+            logger.info(f"Full request details:")
+            logger.info(f"  URL: {url}")
+            logger.info(f"  Headers: {headers}")
+            logger.info(f"  Payload: {payload}")
 
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.post(url, headers=headers, json=payload)
-            
-            logger.info(f"Evolution API response: Status {r.status_code}")
-            logger.info(f"Response headers: {dict(r.headers)}")
-            
-            if r.status_code >= 400:
-                error_details = {
-                    "status_code": r.status_code,
-                    "response_text": r.text,
-                    "url": url,
-                    "original_number": to_number,
-                    "formatted_number": formatted_number,
-                    "payload_text_length": len(text),
-                    "instance_id": INSTANCE_ID,
-                    "headers_sent": {k: v for k, v in headers.items() if k.lower() != 'apikey'},
-                    "request_headers_full": headers,
-                    "request_payload": payload
-                }
-                logger.error(f"Evolution API error details: {error_details}")
+            async with httpx.AsyncClient(timeout=15) as client:
+                r = await client.post(url, headers=headers, json=payload)
                 
-                if r.status_code == 400:
-                    raise Exception(f"Evolution API Bad Request (400): {r.text}")
-                elif r.status_code == 401:
-                    raise Exception(f"Evolution API Unauthorized (401): Check instance connection or API key")
-                elif r.status_code == 403:
-                    raise Exception(f"Evolution API Forbidden (403): Check permissions")
-                elif r.status_code == 404:
-                    raise Exception(f"Evolution API Not Found (404): Check instance ID '{INSTANCE_ID}'")
+                logger.info(f"Evolution API response: Status {r.status_code} for endpoint {endpoint_index + 1}")
+                logger.info(f"Response headers: {dict(r.headers)}")
+                
+                if r.status_code < 400:
+                    logger.info(f"✅ Message sent successfully via Evolution API!")
+                    logger.info(f"Successful endpoint: {url}")
+                    logger.info(f"Response: {r.text}")
+                    return  # Éxito, salir de la función
                 else:
-                    raise Exception(f"Evolution API error: {r.status_code} - {r.text}")
-            else:
-                logger.info(f"✅ Message sent successfully via Evolution API!")
-                logger.info(f"Response: {r.text}")
-                
-    except httpx.TimeoutException:
-        logger.error("Evolution API request timed out")
-        raise Exception("Evolution API request timed out")
-    except httpx.RequestError as e:
-        logger.error(f"Evolution API request error: {e}")
-        raise Exception(f"Evolution API connection error: {e}")
-    except Exception as e:
-        if "Evolution API" in str(e):
-            raise  # Re-raise our custom exceptions
-        else:
-            logger.error(f"Unexpected error in send_evolution_message: {e}", exc_info=True)
-            raise Exception(f"Unexpected error sending message: {e}")
+                    logger.warning(f"❌ Failed with endpoint {url}: {r.status_code} - {r.text}")
+                    last_error = r.text
+                    
+        except Exception as e:
+            logger.warning(f"Error with endpoint {url}: {e}")
+            last_error = str(e)
+            continue
+    
+    # Si llegamos aquí, todos los endpoints fallaron
+    error_details = {
+        "endpoints_tried": len(endpoints_to_try),
+        "last_error": last_error,
+        "original_number": to_number,
+        "formatted_number": formatted_number,
+        "payload_text_length": len(text),
+        "instance_id": INSTANCE_ID,
+        "headers_sent": {k: v for k, v in headers.items() if k.lower() != 'apikey'},
+        "request_headers_full": headers,
+        "request_payload": payload
+    }
+    logger.error(f"All Evolution API endpoints failed: {error_details}")
+    
+    if "not-acceptable" in str(last_error).lower():
+        raise Exception(f"Evolution API endpoint issue: All endpoints returned 'not-acceptable'. Please check Evolution API documentation.")
+    else:
+        raise Exception(f"Evolution API error after trying multiple endpoints: {last_error}")
