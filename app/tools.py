@@ -679,6 +679,8 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
         
     except Exception as e:
         logger.error(f"❌ Error en búsqueda flexible: {str(e)}")
+        logger.error(f"❌ Tipo de error: {type(e).__name__}")
+        logger.error(f"❌ Detalles completos del error:", exc_info=True)
         return []
 
 

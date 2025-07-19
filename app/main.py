@@ -232,7 +232,7 @@ async def send_evolution_message(to_number: str, text: str):
             
             logger.info(f"Evolution API response: {response.status_code}")
             
-            if response.status_code == 200:
+            if response.status_code in [200, 201]:
                 logger.info("✅ Message sent successfully!")
                 return
             else:
