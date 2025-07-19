@@ -350,7 +350,7 @@ def normalize_age_group_search(age_group: str) -> List[str]:
     
     # Mapeo de términos de búsqueda a grupos etarios reales
     age_group_mappings = {
-        # Pediatría/Niños - MÁS VARIACIONES
+        # Pediatría/Niños - SOLO PEDIATRÍA REAL
         "pediatra": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
         "pediatras": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
         "pediatría": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
@@ -373,11 +373,11 @@ def normalize_age_group_search(age_group: str) -> List[str]:
         "chicos": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
         "chicas": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
         
-        # Adultos
-        "adulto": ["adulto", "adulto y pediatría"],
-        "adultos": ["adulto", "adulto y pediatría"],
-        "adulta": ["adulto", "adulto y pediatría"],
-        "adultas": ["adulto", "adulto y pediatría"],
+        # Adultos - SOLO ADULTOS (NO PEDIATRÍA)
+        "adulto": ["adulto"],
+        "adultos": ["adulto"],
+        "adulta": ["adulto"],
+        "adultas": ["adulto"],
         
         # Adultos mayores/Geriatría
         "adulto mayor": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
@@ -658,7 +658,27 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                     if age_group_terms:
                         age_group_value = str(record.get("age_group", "")).lower()
                         age_match = check_multi_value_field(age_group_value, age_group_terms)
-                        if age_match:
+                        
+                        # Validación adicional para pediatría: asegurar que realmente sea pediatra
+                        if age_match and any(term in age_group_terms for term in ["pediatría", "pediatria", "niños", "infantil", "adulto y pediatría"]):
+                            # Verificar que el título o especialidad también sea pediátrico
+                            title_value = str(record.get("title", "")).lower()
+                            specialty_value = str(record.get("specialty", "")).lower()
+                            
+                            # Términos que indican que es realmente pediatra
+                            pediatric_indicators = ["pediatra", "pediatría", "pediatria", "pediatrico", "pediatrica", "pediátrico", "pediátrica", "médico"]
+                            
+                            is_pediatrician = (
+                                any(indicator in title_value for indicator in pediatric_indicators) or
+                                any(indicator in specialty_value for indicator in pediatric_indicators)
+                            )
+                            
+                            if is_pediatrician:
+                                logger.info(f"✅ Match de grupo etario PEDIÁTRICO confirmado en registro {i+1}: {record.get('name', 'N/A')} - age_group: '{age_group_value}', title: '{title_value}', specialty: '{specialty_value}'")
+                            else:
+                                logger.info(f"⚠️ Match de grupo etario pero NO es pediatra en registro {i+1}: {record.get('name', 'N/A')} - age_group: '{age_group_value}', title: '{title_value}', specialty: '{specialty_value}'")
+                                age_match = False  # No contar como match válido
+                        elif age_match:
                             logger.info(f"✅ Match de grupo etario en registro {i+1}: {record.get('name', 'N/A')} - age_group: '{age_group_value}'")
                     
                     # Verificar términos de especialidad
