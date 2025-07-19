@@ -225,9 +225,17 @@ class MessageBatcher:
         
         # Procesar el mensaje combinado
         try:
-            callback(combined_message)
+            # Crear una tarea asíncrona para ejecutar el callback
+            asyncio.create_task(self._execute_callback(callback, combined_message))
         except Exception as e:
             logger.error(f"❌ Error procesando batch para {chat_id}: {e}")
+    
+    async def _execute_callback(self, callback, combined_message):
+        """Ejecuta el callback de manera asíncrona."""
+        try:
+            await callback(combined_message)
+        except Exception as e:
+            logger.error(f"❌ Error ejecutando callback: {e}")
     
     def _combine_messages(self, messages: List[str]) -> str:
         """
