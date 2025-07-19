@@ -1,8 +1,10 @@
 import json
 import logging
 import os
+import asyncio
+import time
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 from redis import Redis
 
@@ -14,6 +16,11 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 # Memoria en RAM como fallback
 memory_fallback = {}
+
+# Sistema de batching de mensajes
+message_batches = {}  # chat_id -> {messages: [], last_update: timestamp, task: asyncio.Task}
+BATCH_TIMEOUT = 3.0  # segundos de espera antes de procesar
+MAX_BATCH_SIZE = 10  # máximo número de mensajes por batch
 
 def get_redis_client():
     """Obtiene cliente Redis o None si no está configurado."""
@@ -116,3 +123,176 @@ def set_memory(chat_id: str, messages: List[Dict]):
         oldest_key = next(iter(memory_fallback))
         del memory_fallback[oldest_key]
         logger.info(f"🧹 Memoria vieja limpiada: {oldest_key}")
+
+
+class MessageBatcher:
+    """Sistema de batching de mensajes para agrupar mensajes consecutivos."""
+    
+    def __init__(self):
+        self.batches = {}  # chat_id -> {messages: [], last_update: timestamp, task: Optional[asyncio.Task]}
+        self.processing_callbacks = {}  # chat_id -> callback function
+    
+    def add_message(self, chat_id: str, message: str, callback) -> bool:
+        """
+        Agrega un mensaje al batch y programa su procesamiento.
+        
+        Args:
+            chat_id: ID del chat
+            message: Mensaje del usuario
+            callback: Función a llamar cuando se procese el batch
+            
+        Returns:
+            True si el mensaje se agregó al batch, False si se procesó inmediatamente
+        """
+        current_time = time.time()
+        
+        # Si no hay batch activo para este chat, crear uno nuevo
+        if chat_id not in self.batches:
+            self.batches[chat_id] = {
+                "messages": [],
+                "last_update": current_time,
+                "task": None
+            }
+            self.processing_callbacks[chat_id] = callback
+        
+        batch = self.batches[chat_id]
+        batch["messages"].append(message)
+        batch["last_update"] = current_time
+        
+        logger.info(f"📦 Mensaje agregado al batch para {chat_id}: '{message[:50]}...' (total: {len(batch['messages'])})")
+        
+        # Si alcanzamos el tamaño máximo, procesar inmediatamente
+        if len(batch["messages"]) >= MAX_BATCH_SIZE:
+            logger.info(f"🚀 Batch completo para {chat_id}, procesando inmediatamente")
+            self._process_batch(chat_id)
+            return False
+        
+        # Cancelar tarea anterior si existe
+        if batch["task"] and not batch["task"].done():
+            batch["task"].cancel()
+            logger.debug(f"🔄 Tarea anterior cancelada para {chat_id}")
+        
+        # Programar nueva tarea
+        batch["task"] = asyncio.create_task(self._schedule_batch_processing(chat_id))
+        logger.debug(f"⏰ Tarea programada para {chat_id} en {BATCH_TIMEOUT} segundos")
+        
+        return True
+    
+    async def _schedule_batch_processing(self, chat_id: str):
+        """Espera el timeout y luego procesa el batch."""
+        try:
+            await asyncio.sleep(BATCH_TIMEOUT)
+            
+            # Verificar si el batch aún existe y no ha sido procesado
+            if chat_id in self.batches:
+                batch = self.batches[chat_id]
+                current_time = time.time()
+                
+                # Solo procesar si han pasado suficientes segundos desde el último mensaje
+                if current_time - batch["last_update"] >= BATCH_TIMEOUT:
+                    logger.info(f"⏰ Timeout alcanzado para {chat_id}, procesando batch")
+                    self._process_batch(chat_id)
+                else:
+                    logger.debug(f"⏰ Timeout alcanzado pero batch actualizado recientemente para {chat_id}")
+                    
+        except asyncio.CancelledError:
+            logger.debug(f"🔄 Tarea cancelada para {chat_id}")
+        except Exception as e:
+            logger.error(f"❌ Error en schedule_batch_processing para {chat_id}: {e}")
+    
+    def _process_batch(self, chat_id: str):
+        """Procesa el batch de mensajes."""
+        if chat_id not in self.batches:
+            logger.warning(f"⚠️ No se encontró batch para {chat_id}")
+            return
+        
+        batch = self.batches[chat_id]
+        callback = self.processing_callbacks.get(chat_id)
+        
+        if not callback:
+            logger.error(f"❌ No se encontró callback para {chat_id}")
+            return
+        
+        # Combinar todos los mensajes en uno solo
+        combined_message = self._combine_messages(batch["messages"])
+        logger.info(f"🔄 Procesando batch para {chat_id}: {len(batch['messages'])} mensajes combinados")
+        logger.debug(f"📝 Mensaje combinado: '{combined_message[:100]}...'")
+        
+        # Limpiar batch
+        del self.batches[chat_id]
+        if chat_id in self.processing_callbacks:
+            del self.processing_callbacks[chat_id]
+        
+        # Procesar el mensaje combinado
+        try:
+            callback(combined_message)
+        except Exception as e:
+            logger.error(f"❌ Error procesando batch para {chat_id}: {e}")
+    
+    def _combine_messages(self, messages: List[str]) -> str:
+        """
+        Combina múltiples mensajes en uno solo de manera inteligente.
+        
+        Estrategias:
+        1. Si son saludos + solicitud, combinar naturalmente
+        2. Si son frases incompletas, unirlas
+        3. Si son mensajes completos, separar con espacios
+        """
+        if len(messages) == 1:
+            return messages[0]
+        
+        combined = []
+        current_phrase = []
+        
+        for i, message in enumerate(messages):
+            message = message.strip()
+            
+            # Detectar saludos
+            if message.lower() in ["hola", "buenos días", "buenas", "buenas tardes", "buenas noches", "muchas gracias", "gracias"]:
+                if current_phrase:
+                    combined.append(" ".join(current_phrase))
+                    current_phrase = []
+                combined.append(message)
+                continue
+            
+            # Detectar frases incompletas (terminan con preposiciones, artículos, etc.)
+            incomplete_endings = ["de", "en", "con", "para", "por", "sin", "sobre", "entre", "hacia", "hasta", "desde", "durante", "mediante", "según", "un", "una", "el", "la", "los", "las", "este", "esta", "estos", "estas", "ese", "esa", "esos", "esas", "aquel", "aquella", "aquellos", "aquellas"]
+            
+            if any(message.lower().endswith(f" {ending}") for ending in incomplete_endings):
+                current_phrase.append(message)
+            else:
+                current_phrase.append(message)
+                if current_phrase:
+                    combined.append(" ".join(current_phrase))
+                    current_phrase = []
+        
+        # Agregar cualquier frase pendiente
+        if current_phrase:
+            combined.append(" ".join(current_phrase))
+        
+        result = " ".join(combined)
+        logger.debug(f"🔗 Mensajes combinados: {messages} -> '{result}'")
+        return result
+    
+    def get_batch_status(self, chat_id: str) -> Optional[Dict]:
+        """Obtiene el estado actual del batch para un chat."""
+        if chat_id not in self.batches:
+            return None
+        
+        batch = self.batches[chat_id]
+        return {
+            "message_count": len(batch["messages"]),
+            "last_update": batch["last_update"],
+            "time_since_last": time.time() - batch["last_update"],
+            "messages": batch["messages"]
+        }
+    
+    def force_process(self, chat_id: str):
+        """Fuerza el procesamiento inmediato del batch."""
+        if chat_id in self.batches:
+            logger.info(f"⚡ Forzando procesamiento de batch para {chat_id}")
+            self._process_batch(chat_id)
+
+
+# Instancia global del batcher
+message_batcher = MessageBatcher()

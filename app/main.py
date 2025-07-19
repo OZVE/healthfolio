@@ -14,7 +14,8 @@ from .utils import (
     extract_text_from_event, 
     get_chat_id, 
     extract_text_from_twilio_event, 
-    get_twilio_chat_id
+    get_twilio_chat_id,
+    message_batcher
 )
 from .twilio_client import (
     send_twilio_whatsapp_message, 
@@ -92,6 +93,45 @@ async def health_check():
         }
 
 
+@app.get("/batches")
+async def get_batch_status():
+    """Endpoint para monitorear el estado de los batches de mensajes."""
+    try:
+        batches_info = {}
+        for chat_id in message_batcher.batches:
+            status = message_batcher.get_batch_status(chat_id)
+            if status:
+                batches_info[chat_id] = status
+        
+        return {
+            "active_batches": len(batches_info),
+            "batches": batches_info,
+            "config": {
+                "batch_timeout": 3.0,
+                "max_batch_size": 10
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting batch status: {str(e)}")
+        return {"error": str(e)}
+
+
+@app.post("/batches/{chat_id}/force")
+async def force_process_batch(chat_id: str):
+    """Fuerza el procesamiento inmediato de un batch específico."""
+    try:
+        if chat_id not in message_batcher.batches:
+            return {"error": f"No hay batch activo para {chat_id}"}
+        
+        message_batcher.force_process(chat_id)
+        return {"success": True, "message": f"Batch forzado para {chat_id}"}
+        
+    except Exception as e:
+        logger.error(f"Error forcing batch for {chat_id}: {str(e)}")
+        return {"error": str(e)}
+
+
 @app.get("/")
 async def root():
     """Endpoint raíz con información del estado del servicio."""
@@ -124,11 +164,7 @@ async def webhook_evolution(request: Request):
         chat_id = get_chat_id(event_json)
         logger.info(f"Processing message: '{user_text}' from {chat_id}")
         
-        reply_text = process(user_text, chat_id)
-        logger.info(f"Generated reply: {reply_text[:100]}...")
-        
-        await send_whatsapp_message(chat_id, reply_text)
-        logger.info("Message sent successfully")
+        await process_message_with_batching(chat_id, user_text)
 
         return {"status": "ok"}
         
@@ -173,13 +209,21 @@ async def webhook_twilio(
         chat_id = get_twilio_chat_id(form_data)
         logger.info(f"Processing Twilio message: '{user_text}' from {chat_id}")
         
-        reply_text = process(user_text, chat_id)
-        logger.info(f"Generated reply: {reply_text[:100]}...")
-        
-        twiml_response = create_twilio_response(reply_text)
-        logger.info("Response sent via Twilio TwiML")
-        
-        return PlainTextResponse(twiml_response, media_type="application/xml")
+        # Para Twilio, necesitamos manejar la respuesta de manera diferente
+        # porque no podemos usar async/await en el webhook
+        try:
+            reply_text = process(user_text, chat_id)
+            logger.info(f"Generated reply: {reply_text[:100]}...")
+            
+            twiml_response = create_twilio_response(reply_text)
+            logger.info("Response sent via Twilio TwiML")
+            
+            return PlainTextResponse(twiml_response, media_type="application/xml")
+            
+        except Exception as e:
+            logger.error(f"❌ Error processing Twilio message: {str(e)}")
+            error_response = create_twilio_response("Lo siento, hubo un error procesando tu mensaje. ¿Podrías intentarlo de nuevo?")
+            return PlainTextResponse(error_response, media_type="application/xml")
         
     except Exception as e:
         logger.error(f"Twilio webhook error: {str(e)}", exc_info=True)
@@ -194,6 +238,35 @@ async def send_whatsapp_message(to_number: str, text: str):
             raise Exception("Failed to send message via Twilio")
     else:  # evolution
         await send_evolution_message(to_number, text)
+
+
+async def process_message_with_batching(chat_id: str, user_text: str):
+    """Procesa un mensaje usando el sistema de batching."""
+    
+    async def process_combined_message(combined_text: str):
+        """Callback que se ejecuta cuando se procesa el batch."""
+        logger.info(f"🔄 Procesando mensaje combinado para {chat_id}: '{combined_text[:100]}...'")
+        
+        try:
+            reply_text = process(combined_text, chat_id)
+            logger.info(f"💬 Respuesta generada para {chat_id}: {reply_text[:100]}...")
+            
+            await send_whatsapp_message(chat_id, reply_text)
+            logger.info(f"✅ Mensaje enviado exitosamente a {chat_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error procesando mensaje combinado para {chat_id}: {str(e)}")
+            error_message = "Lo siento, hubo un error procesando tu mensaje. ¿Podrías intentarlo de nuevo?"
+            await send_whatsapp_message(chat_id, error_message)
+    
+    # Agregar mensaje al batch
+    was_batched = message_batcher.add_message(chat_id, user_text, process_combined_message)
+    
+    if was_batched:
+        logger.info(f"📦 Mensaje agregado al batch para {chat_id}, esperando más mensajes...")
+        # No enviar respuesta inmediata, esperar el batch
+    else:
+        logger.info(f"🚀 Mensaje procesado inmediatamente para {chat_id}")
 
 
 async def send_evolution_message(to_number: str, text: str):

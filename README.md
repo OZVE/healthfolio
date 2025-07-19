@@ -143,6 +143,9 @@ curl http://localhost:8000/
 | Endpoint | Proveedor | Descripción |
 |----------|-----------|-------------|
 | `GET /` | Ambos | Estado del servicio y proveedores |
+| `GET /health` | Ambos | Health check detallado |
+| `GET /batches` | Ambos | Estado de batches de mensajes |
+| `POST /batches/{chat_id}/force` | Ambos | Forzar procesamiento de batch |
 | `POST /webhook` | Evolution API | Webhook para Evolution API |
 | `POST /webhook/twilio` | Twilio | Webhook para Twilio WhatsApp |
 
@@ -284,6 +287,61 @@ uvicorn app.main:app --reload --log-level debug
 - 📱 **Multi-format Support**: Soporte para diferentes formatos de mensaje
 - 💾 **Persistent Memory**: Memoria conversacional con Redis
 - 🔍 **Smart Search**: Búsqueda inteligente con mapeo de especialidades
+- 📦 **Message Batching**: Agrupa mensajes consecutivos para conversaciones naturales
+
+## 📦 **Sistema de Batching de Mensajes**
+
+El sistema implementa un mecanismo inteligente de agrupación de mensajes que mejora significativamente la experiencia de conversación:
+
+### **¿Cómo Funciona?**
+
+1. **Agrupación Automática**: Cuando un usuario envía múltiples mensajes seguidos, el sistema los agrupa automáticamente
+2. **Timeout Inteligente**: Espera 3 segundos después del último mensaje antes de procesar
+3. **Combinación Inteligente**: Une los mensajes de manera natural (saludos + solicitudes, frases incompletas, etc.)
+4. **Procesamiento Único**: Procesa todos los mensajes como una sola conversación
+
+### **Ejemplo de Funcionamiento**
+
+**Antes (sin batching):**
+```
+Usuario: "Hola"
+Bot: "¡Hola! ¿En qué puedo ayudarte?"
+
+Usuario: "Necesito un"
+Bot: "¿Podrías completar tu mensaje?"
+
+Usuario: "cardiólogo"
+Bot: "Entiendo que buscas un cardiólogo..."
+
+Usuario: "en Santiago"
+Bot: "Perfecto, buscaré cardiólogos en Santiago..."
+```
+
+**Después (con batching):**
+```
+Usuario: "Hola"
+Usuario: "Necesito un"
+Usuario: "cardiólogo"
+Usuario: "en Santiago"
+[3 segundos de espera]
+Bot: "¡Hola! Te ayudo a encontrar cardiólogos en Santiago..."
+```
+
+### **Configuración**
+
+- **Timeout**: 3 segundos (configurable)
+- **Tamaño máximo**: 10 mensajes por batch
+- **Combinación inteligente**: Detecta saludos, frases incompletas, etc.
+
+### **Monitoreo**
+
+```bash
+# Ver estado de batches activos
+curl http://localhost:8000/batches
+
+# Forzar procesamiento de un batch específico
+curl -X POST http://localhost:8000/batches/123456789/force
+```
 
 ## 📋 **Proceso Paso a Paso para tu Número**
 
