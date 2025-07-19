@@ -691,11 +691,8 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         if city_match and (age_match or specialty_match):
                             logger.info(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')} - Ciudad requerida y especialidad coinciden")
                             matches.append(record)
-                        elif city_match:
-                            logger.info(f"⚠️ Match de ciudad sin especialidad en registro {i+1}: {record.get('name', 'N/A')} - Solo ciudad coincide")
-                            matches.append(record)
                         else:
-                            logger.info(f"❌ No match en registro {i+1}: {record.get('name', 'N/A')} - Ciudad no coincide")
+                            logger.info(f"❌ No match en registro {i+1}: {record.get('name', 'N/A')} - No cumple criterios de ciudad Y especialidad")
                     else:
                         # Si no se especificó ciudad, usar lógica OR original
                         match_found = age_match or specialty_match
