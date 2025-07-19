@@ -649,30 +649,36 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                 logger.info(f"🔍 Usando búsqueda inteligente con términos detectados")
                 
                 for i, record in enumerate(rows):
-                    match_found = True
+                    # Usar lógica OR: al menos uno de los tipos de términos debe coincidir
+                    age_match = False
+                    specialty_match = False
+                    city_match = False
                     
                     # Verificar términos de grupo etario
                     if age_group_terms:
                         age_group_value = str(record.get("age_group", "")).lower()
                         age_match = check_multi_value_field(age_group_value, age_group_terms)
-                        if not age_match:
-                            match_found = False
+                        if age_match:
+                            logger.info(f"✅ Match de grupo etario en registro {i+1}: {record.get('name', 'N/A')} - age_group: '{age_group_value}'")
                     
                     # Verificar términos de especialidad
-                    if specialty_terms and match_found:
+                    if specialty_terms:
                         specialty_value = str(record.get("specialty", "")).lower()
                         title_value = str(record.get("title", "")).lower()
                         specialty_match = check_multi_value_field(specialty_value, specialty_terms) or check_multi_value_field(title_value, specialty_terms)
-                        if not specialty_match:
-                            match_found = False
+                        if specialty_match:
+                            logger.info(f"✅ Match de especialidad en registro {i+1}: {record.get('name', 'N/A')} - specialty: '{specialty_value}', title: '{title_value}'")
                     
                     # Verificar términos de ciudad
-                    if city_terms and match_found:
+                    if city_terms:
                         coverage_value = str(record.get("coverage_area", "")).lower()
                         region_value = str(record.get("work_region", "")).lower()
                         city_match = check_multi_value_field(coverage_value, city_terms) or check_multi_value_field(region_value, city_terms)
-                        if not city_match:
-                            match_found = False
+                        if city_match:
+                            logger.info(f"✅ Match de ciudad en registro {i+1}: {record.get('name', 'N/A')} - coverage: '{coverage_value}', region: '{region_value}'")
+                    
+                    # Al menos uno debe coincidir (lógica OR)
+                    match_found = age_match or specialty_match or city_match
                     
                     if match_found:
                         logger.info(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')}")
