@@ -270,7 +270,10 @@ def normalize_city_search(city: str) -> List[str]:
     
     # También buscar si alguien busca solo la palabra principal
     # Por ejemplo "lagos" debería encontrar "los lagos"
-    if not any(article in city_lower for article in ["los ", "las ", "la ", "el "]):
+    # PERO SOLO SI ES UNA CIUDAD REAL
+    valid_cities = ["santiago", "independencia", "recoleta", "providencia", "ñuñoa", "la reina", "las condes", "vitacura", "lo barnechea", "macul", "peñalolén", "la florida", "puente alto", "huechuraba", "conchalí", "conchali", "quilicura", "colina", "til-til", "til til", "cerro navia", "lo prado", "pudahuel", "quinta normal", "renca", "estación central", "estacion central", "maipú", "maipu", "cerrillos", "padre hurtado", "peñaflor", "el monte", "talagante", "isla de maipo", "san miguel", "la cisterna", "la granja", "la pintana", "pedro aguirre cerda", "florida", "condes", "nuñoa", "maipu", "estacion", "peñaflor", "conchali"]
+    
+    if not any(article in city_lower for article in ["los ", "las ", "la ", "el "]) and city_lower in valid_cities:
         variations.extend([f"los {city_lower}", f"las {city_lower}", f"la {city_lower}", f"el {city_lower}"])
     
     logger.info(f"🏙️ Variaciones de ciudad para '{city}': {variations}")
@@ -962,7 +965,7 @@ def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
                     logger.info(f"✅ Match normalizado de ciudad encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
                     return True
                 else:
-                    logger.info(f"❌ No match de ciudad: buscando '{search_term}' en '{field_val}'")
+                    logger.debug(f"❌ No match de ciudad: buscando '{search_term}' en '{field_val}'")
             else:
                 # Para otros términos, usar lógica más flexible
                 if search_term in field_val or field_val in search_term:
