@@ -113,11 +113,11 @@ FIND_PROF_BY_NAME_FN = {
     "type": "function",
     "function": {
         "name": "find_professional_by_name",
-        "description": "Busca un profesional específico por nombre (legacy - se recomienda usar search_professionals_flexible con criterio 'name')",
+        "description": "Busca un profesional específico por nombre. ÚSALA cuando el usuario solicite información detallada de un profesional específico que ya fue mencionado en la conversación anterior. Es más eficiente que hacer una búsqueda general cuando ya conoces el nombre exacto del profesional.",
         "parameters": {
             "type": "object",
             "properties": {
-                "name": {"type": "string"},
+                "name": {"type": "string", "description": "Nombre completo o parcial del profesional (ej: 'Elena Campos Flores', 'Elena Campos', 'Campos')"},
             },
             "required": ["name"],
         },
@@ -199,7 +199,7 @@ def process(user_input: str, chat_id: str) -> str:
                     logger.info(f"🔍 Llamando search_professionals_flexible con query='{search_query}'")
                     results = search_professionals_flexible(search_query)
                 logger.info(f"📋 Encontrados {len(results)} profesionales con búsqueda flexible")
-                logger.info(f"📋 Resultados: {results}")
+                logger.debug(f"📋 Resultados: {results}")
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
@@ -215,7 +215,7 @@ def process(user_input: str, chat_id: str) -> str:
                     logger.info(f"🏥 Llamando find_professionals (legacy) con specialty='{args['specialty']}', city='{args['city']}'")
                     pros = find_professionals(args["specialty"], args["city"])
                 logger.info(f"📋 Encontrados {len(pros)} profesionales con búsqueda legacy")
-                logger.info(f"📋 Datos encontrados: {pros}")
+                logger.debug(f"📋 Datos encontrados: {pros}")
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
@@ -225,7 +225,7 @@ def process(user_input: str, chat_id: str) -> str:
                 args = json.loads(tc.function.arguments)
                 logger.info(f"👤 Llamando find_professional_by_name (legacy) con name='{args['name']}'")
                 pro = find_professional_by_name(args["name"])
-                logger.info(f"📋 Profesional encontrado: {pro}")
+                logger.debug(f"📋 Profesional encontrado: {pro}")
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
@@ -246,11 +246,11 @@ def process(user_input: str, chat_id: str) -> str:
         ]
     )[-20:]
     
-    logger.info(f"📝 Preparando mensajes para memoria:")
-    logger.info(f"   - Historia anterior: {len(history)} mensajes")
-    logger.info(f"   - Mensaje del usuario: '{user_input[:50]}...'")
-    logger.info(f"   - Respuesta del asistente: '{final_text[:50]}...'")
-    logger.info(f"   - Total a guardar: {len(messages_to_save)} mensajes")
+    logger.debug(f"📝 Preparando mensajes para memoria:")
+    logger.debug(f"   - Historia anterior: {len(history)} mensajes")
+    logger.debug(f"   - Mensaje del usuario: '{user_input[:50]}...'")
+    logger.debug(f"   - Respuesta del asistente: '{final_text[:50]}...'")
+    logger.debug(f"   - Total a guardar: {len(messages_to_save)} mensajes")
     
     set_memory(chat_id, messages_to_save)
     logger.info(f"💾 Memoria actualizada para chat_id: {chat_id}")

@@ -229,7 +229,6 @@ def normalize_specialty_search(specialty: str) -> List[str]:
         if v not in unique_variations:
             unique_variations.append(v)
     
-    logger.info(f"🔍 Variaciones de '{specialty}': {unique_variations}")
     return unique_variations
 
 def normalize_city_search(city: str) -> List[str]:
@@ -475,27 +474,27 @@ def find_professionals(specialty: str, city: str, availability: str = None) -> L
                 availability_match = days_match or hours_match
                 
                 if not availability_match:
-                    logger.info(f"🕐 No match de disponibilidad en fila {i+1}: días '{availability_days_text}' y horas '{availability_hours_text}' no contienen ninguno de {availability_terms}")
+                    logger.debug(f"🕐 No match de disponibilidad en fila {i+1}: días '{availability_days_text}' y horas '{availability_hours_text}' no contienen ninguno de {availability_terms}")
             
             if professional_match and city_match and availability_match:
-                logger.info(f"✅ Match completo encontrado en fila {i+1}: {r}")
+                logger.debug(f"✅ Match completo encontrado en fila {i+1}: {r}")
                 if specialty_match:
-                    logger.info(f"✅ Specialty match: '{specialty_text}' contiene alguno de {specialty_terms}")
+                    logger.debug(f"✅ Specialty match: '{specialty_text}' contiene alguno de {specialty_terms}")
                 if title_match:
-                    logger.info(f"✅ Title match: '{title_text}' contiene alguno de {specialty_terms}")
-                logger.info(f"✅ City match: '{coverage_area_text}' contiene alguno de {city_terms}")
+                    logger.debug(f"✅ Title match: '{title_text}' contiene alguno de {specialty_terms}")
+                logger.debug(f"✅ City match: '{coverage_area_text}' contiene alguno de {city_terms}")
                 if availability:
                     if days_match:
-                        logger.info(f"✅ Availability days match: '{availability_days_text}' contiene alguno de {availability_terms}")
+                        logger.debug(f"✅ Availability days match: '{availability_days_text}' contiene alguno de {availability_terms}")
                     if hours_match:
-                        logger.info(f"✅ Availability hours match: '{availability_hours_text}' contiene alguno de {availability_terms}")
+                        logger.debug(f"✅ Availability hours match: '{availability_hours_text}' contiene alguno de {availability_terms}")
                 matches.append(r)
             elif professional_match and city_match:
-                logger.info(f"🔍 Professional y city match (pero no availability) en fila {i+1}: {r}")
+                logger.debug(f"🔍 Professional y city match (pero no availability) en fila {i+1}: {r}")
             elif professional_match:
-                logger.info(f"🔍 Professional match (pero no city/availability) en fila {i+1}: {r}")
+                logger.debug(f"🔍 Professional match (pero no city/availability) en fila {i+1}: {r}")
             elif city_match:
-                logger.info(f"🔍 City match (pero no professional/availability) en fila {i+1}: {r}")
+                logger.debug(f"🔍 City match (pero no professional/availability) en fila {i+1}: {r}")
         
         logger.info(f"📋 Total matches encontrados: {len(matches)}")
         return matches
@@ -519,7 +518,7 @@ def find_professional_by_name(name: str) -> Dict:
             professional_name = str(r.get("name", "")).lower()
             search_name = name.lower().strip()
             
-            logger.info(f"🔍 Comparando: '{search_name}' con '{professional_name}' (registro {i+1})")
+            logger.debug(f"🔍 Comparando: '{search_name}' con '{professional_name}' (registro {i+1})")
             
             # Búsqueda más robusta
             name_match = False
@@ -527,17 +526,17 @@ def find_professional_by_name(name: str) -> Dict:
             # 1. Búsqueda exacta
             if search_name == professional_name:
                 name_match = True
-                logger.info(f"✅ Match exacto encontrado")
+                logger.debug(f"✅ Match exacto encontrado")
             
             # 2. Búsqueda parcial (nombre en nombre completo)
             elif search_name in professional_name:
                 name_match = True
-                logger.info(f"✅ Match parcial encontrado: '{search_name}' está en '{professional_name}'")
+                logger.debug(f"✅ Match parcial encontrado: '{search_name}' está en '{professional_name}'")
             
             # 3. Búsqueda por apellido
             elif any(apellido in professional_name for apellido in search_name.split()):
                 name_match = True
-                logger.info(f"✅ Match por apellido encontrado")
+                logger.debug(f"✅ Match por apellido encontrado")
             
             if name_match:
                 # Extraer información específica del profesional
@@ -682,7 +681,7 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         age_match = check_multi_value_field(age_group_value, age_group_terms)
                         
                         if age_match:
-                            logger.info(f"✅ Match de grupo etario en registro {i+1}: {record.get('name', 'N/A')} - age_group: '{age_group_value}'")
+                            logger.debug(f"✅ Match de grupo etario en registro {i+1}: {record.get('name', 'N/A')} - age_group: '{age_group_value}'")
                     
                     # Verificar términos de especialidad
                     if specialty_terms:
@@ -691,13 +690,13 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         if any(term in ["pediatría", "niños", "infantil"] for term in specialty_terms):
                             specialty_match = check_multi_value_field(specialty_value, specialty_terms)
                             if specialty_match:
-                                logger.info(f"✅ Match de especialidad (pediatría) en registro {i+1}: {record.get('name', 'N/A')} - specialty: '{specialty_value}'")
+                                logger.debug(f"✅ Match de especialidad (pediatría) en registro {i+1}: {record.get('name', 'N/A')} - specialty: '{specialty_value}'")
                         else:
                             # Para otras especialidades, buscar en specialty y title
                             title_value = str(record.get("title", "")).lower()
                             specialty_match = check_multi_value_field(specialty_value, specialty_terms) or check_multi_value_field(title_value, specialty_terms)
                             if specialty_match:
-                                logger.info(f"✅ Match de especialidad en registro {i+1}: {record.get('name', 'N/A')} - specialty: '{specialty_value}', title: '{title_value}'")
+                                logger.debug(f"✅ Match de especialidad en registro {i+1}: {record.get('name', 'N/A')} - specialty: '{specialty_value}', title: '{title_value}'")
                     
                     # Verificar términos de ciudad
                     if city_terms:
@@ -705,21 +704,21 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         region_value = str(record.get("work_region", "")).lower()
                         city_match = check_multi_value_field(coverage_value, city_terms) or check_multi_value_field(region_value, city_terms)
                         if city_match:
-                            logger.info(f"✅ Match de ciudad en registro {i+1}: {record.get('name', 'N/A')} - coverage: '{coverage_value}', region: '{region_value}'")
+                            logger.debug(f"✅ Match de ciudad en registro {i+1}: {record.get('name', 'N/A')} - coverage: '{coverage_value}', region: '{region_value}'")
                     
                     # Lógica de coincidencia mejorada
                     if city_terms:
                         # Si se especificó una ciudad, DEBE coincidir la ciudad Y al menos una especialidad/grupo etario
                         if city_match and (age_match or specialty_match):
-                            logger.info(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')} - Ciudad requerida y especialidad coinciden")
+                            logger.debug(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')} - Ciudad requerida y especialidad coinciden")
                             matches.append(record)
                         else:
-                            logger.info(f"❌ No match en registro {i+1}: {record.get('name', 'N/A')} - No cumple criterios de ciudad Y especialidad")
+                            logger.debug(f"❌ No match en registro {i+1}: {record.get('name', 'N/A')} - No cumple criterios de ciudad Y especialidad")
                     else:
                         # Si no se especificó ciudad, usar lógica OR original
                         match_found = age_match or specialty_match
                         if match_found:
-                            logger.info(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')}")
+                            logger.debug(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')}")
                             matches.append(record)
             
             # Si no detectamos términos específicos, usar búsqueda general
@@ -737,7 +736,7 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                     match_found = any(term in record_text for term in search_terms)
                     
                     if match_found:
-                        logger.info(f"✅ Match general encontrado en registro {i+1}: {record.get('name', 'N/A')}")
+                        logger.debug(f"✅ Match general encontrado en registro {i+1}: {record.get('name', 'N/A')}")
                         matches.append(record)
         
         else:
@@ -778,7 +777,7 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         break
                 
                 if match_found:
-                    logger.info(f"✅ Match con criterios específicos en registro {i+1}: {record.get('name', 'N/A')}")
+                    logger.debug(f"✅ Match con criterios específicos en registro {i+1}: {record.get('name', 'N/A')}")
                     matches.append(record)
         
         logger.info(f"📋 Total matches encontrados: {len(matches)}")
@@ -832,29 +831,29 @@ def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
             if any(term in ["pediatría", "niños", "infantil", "adulto y pediatría"] for term in search_terms):
                 # Solo coincidir si el campo contiene exactamente los términos de pediatría
                 if search_term in field_val:
-                    logger.info(f"✅ Match exacto de pediatría encontrado: '{search_term}' en '{field_val}'")
+                    logger.debug(f"✅ Match exacto de pediatría encontrado: '{search_term}' en '{field_val}'")
                     return True
                 if search_term_normalized in field_val_normalized:
-                    logger.info(f"✅ Match normalizado de pediatría encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
+                    logger.debug(f"✅ Match normalizado de pediatría encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
                     return True
             # Para términos de ciudad, ser más estricto también
             elif any(term in ["puente alto", "santiago", "providencia", "las condes", "ñuñoa", "maipú", "cerrillos", "estación central", "padre hurtado", "peñaflor", "el monte", "talagante", "isla de maipo", "independencia", "recoleta", "la reina", "vitacura", "lo barnechea", "macul", "peñalolén", "la florida", "san miguel", "la cisterna", "la granja", "la pintana", "pedro aguirre cerda"] for term in search_terms):
                 # Solo coincidir si el campo contiene exactamente la ciudad
                 if search_term in field_val:
-                    logger.info(f"✅ Match exacto de ciudad encontrado: '{search_term}' en '{field_val}'")
+                    logger.debug(f"✅ Match exacto de ciudad encontrado: '{search_term}' en '{field_val}'")
                     return True
                 if search_term_normalized in field_val_normalized:
-                    logger.info(f"✅ Match normalizado de ciudad encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
+                    logger.debug(f"✅ Match normalizado de ciudad encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
                     return True
             else:
                 # Para otros términos, usar lógica más flexible
                 if search_term in field_val or field_val in search_term:
-                    logger.info(f"✅ Match exacto encontrado: '{search_term}' en '{field_val}'")
+                    logger.debug(f"✅ Match exacto encontrado: '{search_term}' en '{field_val}'")
                     return True
                 
                 # Búsqueda normalizada (sin tildes)
                 if search_term_normalized in field_val_normalized or field_val_normalized in search_term_normalized:
-                    logger.info(f"✅ Match normalizado encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
+                    logger.debug(f"✅ Match normalizado encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
                     return True
     
     return False
