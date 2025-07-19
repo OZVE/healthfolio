@@ -323,13 +323,13 @@ Usuario: "Hola"
 Usuario: "Necesito un"
 Usuario: "cardiólogo"
 Usuario: "en Santiago"
-[3 segundos de espera]
+[20 segundos de espera]
 Bot: "¡Hola! Te ayudo a encontrar cardiólogos en Santiago..."
 ```
 
 ### **Configuración**
 
-- **Timeout**: 3 segundos (configurable)
+- **Timeout**: 20 segundos (configurable)
 - **Tamaño máximo**: 10 mensajes por batch
 - **Combinación inteligente**: Detecta saludos, frases incompletas, etc.
 

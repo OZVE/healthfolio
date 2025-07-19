@@ -19,7 +19,7 @@ memory_fallback = {}
 
 # Sistema de batching de mensajes
 message_batches = {}  # chat_id -> {messages: [], last_update: timestamp, task: asyncio.Task}
-BATCH_TIMEOUT = 3.0  # segundos de espera antes de procesar
+BATCH_TIMEOUT = 20.0  # segundos de espera antes de procesar
 MAX_BATCH_SIZE = 10  # máximo número de mensajes por batch
 
 def get_redis_client():

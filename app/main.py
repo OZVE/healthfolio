@@ -107,7 +107,7 @@ async def get_batch_status():
             "active_batches": len(batches_info),
             "batches": batches_info,
             "config": {
-                "batch_timeout": 3.0,
+                "batch_timeout": 20.0,
                 "max_batch_size": 10
             }
         }
