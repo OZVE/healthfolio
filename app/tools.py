@@ -718,16 +718,28 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                 if specialty_variations and specialty_variations != [term.lower()]:
                     specialty_terms.extend(specialty_variations)
                     logger.info(f"🏥 Detectado término de especialidad: '{term}' -> {specialty_variations}")
+                elif term.lower() in ["terapia respiratoria", "respiratoria", "respiratorio", "asma", "fibrosis", "covid", "neumonía", "neumonia", "rehabilitación pulmonar", "rehabilitacion pulmonar"]:
+                    specialty_terms.append(term.lower())
+                    logger.info(f"🏥 Detectado término de especialidad directo: '{term}'")
                 
                 # Verificar si es un término de ciudad
                 city_variations = normalize_city_search(term)
                 if city_variations and city_variations != [term.lower()]:
                     city_terms.extend(city_variations)
                     logger.info(f"🏙️ Detectado término de ciudad: '{term}' -> {city_variations}")
+                elif term.lower() in ["santiago", "independencia", "recoleta", "providencia", "ñuñoa", "la reina", "las condes", "vitacura", "lo barnechea", "macul", "peñalolén", "la florida", "puente alto", "huechuraba", "conchalí", "conchali", "quilicura", "colina", "til-til", "til til", "cerro navia", "lo prado", "pudahuel", "quinta normal", "renca", "estación central", "estacion central", "maipú", "maipu", "cerrillos", "padre hurtado", "peñaflor", "el monte", "talagante", "isla de maipo", "san miguel", "la cisterna", "la granja", "la pintana", "pedro aguirre cerda"]:
+                    city_terms.append(term.lower())
+                    logger.info(f"🏙️ Detectado término de ciudad directo: '{term}'")
             
             # Si detectamos términos específicos, usar búsqueda inteligente
             if age_group_terms or specialty_terms or city_terms:
-                logger.info(f"🔍 Usando búsqueda inteligente con términos detectados")
+                logger.info(f"🔍 Usando búsqueda inteligente con términos detectados:")
+                if age_group_terms:
+                    logger.info(f"   👥 Grupos etarios: {age_group_terms}")
+                if specialty_terms:
+                    logger.info(f"   🏥 Especialidades: {specialty_terms}")
+                if city_terms:
+                    logger.info(f"   🏙️ Ciudades: {city_terms}")
                 
                 for i, record in enumerate(rows):
                     # Usar lógica OR: al menos uno de los tipos de términos debe coincidir
@@ -773,6 +785,8 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         city_match = check_multi_value_field(coverage_value, city_terms) or check_multi_value_field(region_value, city_terms)
                         if city_match:
                             logger.debug(f"✅ Match de ciudad en registro {i+1}: {record.get('name', 'N/A')} - coverage: '{coverage_value}', region: '{region_value}'")
+                        else:
+                            logger.debug(f"❌ No match de ciudad en registro {i+1}: {record.get('name', 'N/A')} - coverage: '{coverage_value}', region: '{region_value}' - buscando: {city_terms}")
                     
                     # Lógica de coincidencia mejorada
                     if city_terms:
@@ -782,6 +796,10 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                             matches.append(record)
                         else:
                             logger.debug(f"❌ No match en registro {i+1}: {record.get('name', 'N/A')} - No cumple criterios de ciudad Y especialidad")
+                            if not city_match:
+                                logger.debug(f"   ❌ No coincide ciudad: {city_terms}")
+                            if not (age_match or specialty_match):
+                                logger.debug(f"   ❌ No coincide especialidad/grupo etario")
                     else:
                         # Si no se especificó ciudad, usar lógica OR original
                         match_found = age_match or specialty_match
@@ -935,7 +953,7 @@ def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
                     logger.debug(f"✅ Match normalizado de pediatría encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
                     return True
             # Para términos de ciudad, ser más estricto también
-            elif any(term in ["puente alto", "santiago", "providencia", "las condes", "los condes", "condes", "ñuñoa", "maipú", "cerrillos", "estación central", "padre hurtado", "peñaflor", "el monte", "talagante", "isla de maipo", "independencia", "recoleta", "la reina", "vitacura", "lo barnechea", "macul", "peñalolén", "la florida", "san miguel", "la cisterna", "la granja", "la pintana", "pedro aguirre cerda"] for term in search_terms):
+            elif any(term in ["santiago", "independencia", "recoleta", "providencia", "ñuñoa", "la reina", "las condes", "vitacura", "lo barnechea", "macul", "peñalolén", "la florida", "puente alto", "huechuraba", "conchalí", "conchali", "quilicura", "colina", "til-til", "til til", "cerro navia", "lo prado", "pudahuel", "quinta normal", "renca", "estación central", "estacion central", "maipú", "maipu", "cerrillos", "padre hurtado", "peñaflor", "peñaflor", "el monte", "talagante", "isla de maipo", "san miguel", "la cisterna", "la granja", "la pintana", "pedro aguirre cerda"] for term in search_terms):
                 # Solo coincidir si el campo contiene exactamente la ciudad
                 if search_term in field_val:
                     logger.debug(f"✅ Match exacto de ciudad encontrado: '{search_term}' en '{field_val}'")
