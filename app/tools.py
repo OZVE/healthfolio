@@ -659,26 +659,7 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         age_group_value = str(record.get("age_group", "")).lower()
                         age_match = check_multi_value_field(age_group_value, age_group_terms)
                         
-                        # Validación adicional para pediatría: asegurar que realmente sea pediatra
-                        if age_match and any(term in age_group_terms for term in ["pediatría", "pediatria", "niños", "infantil", "adulto y pediatría"]):
-                            # Verificar que el título o especialidad también sea pediátrico
-                            title_value = str(record.get("title", "")).lower()
-                            specialty_value = str(record.get("specialty", "")).lower()
-                            
-                            # Términos que indican que es realmente pediatra
-                            pediatric_indicators = ["pediatra", "pediatría", "pediatria", "pediatrico", "pediatrica", "pediátrico", "pediátrica", "médico"]
-                            
-                            is_pediatrician = (
-                                any(indicator in title_value for indicator in pediatric_indicators) or
-                                any(indicator in specialty_value for indicator in pediatric_indicators)
-                            )
-                            
-                            if is_pediatrician:
-                                logger.info(f"✅ Match de grupo etario PEDIÁTRICO confirmado en registro {i+1}: {record.get('name', 'N/A')} - age_group: '{age_group_value}', title: '{title_value}', specialty: '{specialty_value}'")
-                            else:
-                                logger.info(f"⚠️ Match de grupo etario pero NO es pediatra en registro {i+1}: {record.get('name', 'N/A')} - age_group: '{age_group_value}', title: '{title_value}', specialty: '{specialty_value}'")
-                                age_match = False  # No contar como match válido
-                        elif age_match:
+                        if age_match:
                             logger.info(f"✅ Match de grupo etario en registro {i+1}: {record.get('name', 'N/A')} - age_group: '{age_group_value}'")
                     
                     # Verificar términos de especialidad
