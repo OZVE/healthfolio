@@ -187,24 +187,24 @@ def normalize_specialty_search(specialty: str) -> List[str]:
         "cardióloga": ["cardiología", "médico"],
         "cardiólogo": ["cardiología", "médico"],
         
-        # PEDIATRÍA - AHORA TAMBIÉN INCLUYE TÉRMINOS PARA age_group
-        "pediatría": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "pediatria": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "pediatra": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "pediatras": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "niños": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "niño": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "niña": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "niñas": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "infantil": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "bebé": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "bebe": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "bebés": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "bebes": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "chico": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "chica": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "chicos": ["pediatría", "médico", "niños", "pediatría", "infantil"],
-        "chicas": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        # PEDIATRÍA - SOLO ESPECIALIDADES Y TÉRMINOS DE GRUPO ETARIO (NO TÍTULOS)
+        "pediatría": ["pediatría", "niños", "infantil"],
+        "pediatria": ["pediatría", "niños", "infantil"],
+        "pediatra": ["pediatría", "niños", "infantil"],
+        "pediatras": ["pediatría", "niños", "infantil"],
+        "niños": ["pediatría", "niños", "infantil"],
+        "niño": ["pediatría", "niños", "infantil"],
+        "niña": ["pediatría", "niños", "infantil"],
+        "niñas": ["pediatría", "niños", "infantil"],
+        "infantil": ["pediatría", "niños", "infantil"],
+        "bebé": ["pediatría", "niños", "infantil"],
+        "bebe": ["pediatría", "niños", "infantil"],
+        "bebés": ["pediatría", "niños", "infantil"],
+        "bebes": ["pediatría", "niños", "infantil"],
+        "chico": ["pediatría", "niños", "infantil"],
+        "chica": ["pediatría", "niños", "infantil"],
+        "chicos": ["pediatría", "niños", "infantil"],
+        "chicas": ["pediatría", "niños", "infantil"],
         
         "enfermería": ["enfermera", "tens"],
         "enfermeria": ["enfermera", "tens"],
@@ -665,10 +665,17 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                     # Verificar términos de especialidad
                     if specialty_terms:
                         specialty_value = str(record.get("specialty", "")).lower()
-                        title_value = str(record.get("title", "")).lower()
-                        specialty_match = check_multi_value_field(specialty_value, specialty_terms) or check_multi_value_field(title_value, specialty_terms)
-                        if specialty_match:
-                            logger.info(f"✅ Match de especialidad en registro {i+1}: {record.get('name', 'N/A')} - specialty: '{specialty_value}', title: '{title_value}'")
+                        # Para pediatría, solo buscar en specialty, no en title para evitar falsos positivos
+                        if any(term in ["pediatría", "niños", "infantil"] for term in specialty_terms):
+                            specialty_match = check_multi_value_field(specialty_value, specialty_terms)
+                            if specialty_match:
+                                logger.info(f"✅ Match de especialidad (pediatría) en registro {i+1}: {record.get('name', 'N/A')} - specialty: '{specialty_value}'")
+                        else:
+                            # Para otras especialidades, buscar en specialty y title
+                            title_value = str(record.get("title", "")).lower()
+                            specialty_match = check_multi_value_field(specialty_value, specialty_terms) or check_multi_value_field(title_value, specialty_terms)
+                            if specialty_match:
+                                logger.info(f"✅ Match de especialidad en registro {i+1}: {record.get('name', 'N/A')} - specialty: '{specialty_value}', title: '{title_value}'")
                     
                     # Verificar términos de ciudad
                     if city_terms:
