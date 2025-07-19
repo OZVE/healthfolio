@@ -729,7 +729,7 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                     logger.info(f"🏙️ Detectado término de ciudad: '{term}' -> {city_variations}")
                 elif term.lower() in ["santiago", "independencia", "recoleta", "providencia", "ñuñoa", "la reina", "las condes", "vitacura", "lo barnechea", "macul", "peñalolén", "la florida", "puente alto", "huechuraba", "conchalí", "conchali", "quilicura", "colina", "til-til", "til til", "cerro navia", "lo prado", "pudahuel", "quinta normal", "renca", "estación central", "estacion central", "maipú", "maipu", "cerrillos", "padre hurtado", "peñaflor", "el monte", "talagante", "isla de maipo", "san miguel", "la cisterna", "la granja", "la pintana", "pedro aguirre cerda"]:
                     city_terms.append(term.lower())
-                    logger.info(f"🏙️ Detectado término de ciudad directo: '{term}'")
+                    logger.info(f"🏙️ Detectado término de ciudad directo: '{term}' -> agregado a city_terms: {city_terms}")
             
             # Si detectamos términos específicos, usar búsqueda inteligente
             if age_group_terms or specialty_terms or city_terms:
@@ -784,22 +784,22 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         region_value = str(record.get("work_region", "")).lower()
                         city_match = check_multi_value_field(coverage_value, city_terms) or check_multi_value_field(region_value, city_terms)
                         if city_match:
-                            logger.debug(f"✅ Match de ciudad en registro {i+1}: {record.get('name', 'N/A')} - coverage: '{coverage_value}', region: '{region_value}'")
+                            logger.info(f"✅ Match de ciudad en registro {i+1}: {record.get('name', 'N/A')} - coverage: '{coverage_value}', region: '{region_value}' - buscando: {city_terms}")
                         else:
-                            logger.debug(f"❌ No match de ciudad en registro {i+1}: {record.get('name', 'N/A')} - coverage: '{coverage_value}', region: '{region_value}' - buscando: {city_terms}")
+                            logger.info(f"❌ No match de ciudad en registro {i+1}: {record.get('name', 'N/A')} - coverage: '{coverage_value}', region: '{region_value}' - buscando: {city_terms}")
                     
                     # Lógica de coincidencia mejorada
                     if city_terms:
                         # Si se especificó una ciudad, DEBE coincidir la ciudad Y al menos una especialidad/grupo etario
                         if city_match and (age_match or specialty_match):
-                            logger.debug(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')} - Ciudad requerida y especialidad coinciden")
+                            logger.info(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')} - Ciudad requerida y especialidad coinciden")
                             matches.append(record)
                         else:
-                            logger.debug(f"❌ No match en registro {i+1}: {record.get('name', 'N/A')} - No cumple criterios de ciudad Y especialidad")
+                            logger.info(f"❌ No match en registro {i+1}: {record.get('name', 'N/A')} - No cumple criterios de ciudad Y especialidad")
                             if not city_match:
-                                logger.debug(f"   ❌ No coincide ciudad: {city_terms}")
+                                logger.info(f"   ❌ No coincide ciudad: {city_terms}")
                             if not (age_match or specialty_match):
-                                logger.debug(f"   ❌ No coincide especialidad/grupo etario")
+                                logger.info(f"   ❌ No coincide especialidad/grupo etario")
                     else:
                         # Si no se especificó ciudad, usar lógica OR original
                         match_found = age_match or specialty_match
@@ -959,8 +959,10 @@ def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
                     logger.debug(f"✅ Match exacto de ciudad encontrado: '{search_term}' en '{field_val}'")
                     return True
                 if search_term_normalized in field_val_normalized:
-                    logger.debug(f"✅ Match normalizado de ciudad encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
+                    logger.info(f"✅ Match normalizado de ciudad encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
                     return True
+                else:
+                    logger.info(f"❌ No match de ciudad: buscando '{search_term}' en '{field_val}'")
             else:
                 # Para otros términos, usar lógica más flexible
                 if search_term in field_val or field_val in search_term:
