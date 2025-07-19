@@ -685,12 +685,23 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         if city_match:
                             logger.info(f"✅ Match de ciudad en registro {i+1}: {record.get('name', 'N/A')} - coverage: '{coverage_value}', region: '{region_value}'")
                     
-                    # Al menos uno debe coincidir (lógica OR)
-                    match_found = age_match or specialty_match or city_match
-                    
-                    if match_found:
-                        logger.info(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')}")
-                        matches.append(record)
+                    # Lógica de coincidencia mejorada
+                    if city_terms:
+                        # Si se especificó una ciudad, DEBE coincidir la ciudad Y al menos una especialidad/grupo etario
+                        if city_match and (age_match or specialty_match):
+                            logger.info(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')} - Ciudad requerida y especialidad coinciden")
+                            matches.append(record)
+                        elif city_match:
+                            logger.info(f"⚠️ Match de ciudad sin especialidad en registro {i+1}: {record.get('name', 'N/A')} - Solo ciudad coincide")
+                            matches.append(record)
+                        else:
+                            logger.info(f"❌ No match en registro {i+1}: {record.get('name', 'N/A')} - Ciudad no coincide")
+                    else:
+                        # Si no se especificó ciudad, usar lógica OR original
+                        match_found = age_match or specialty_match
+                        if match_found:
+                            logger.info(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')}")
+                            matches.append(record)
             
             # Si no detectamos términos específicos, usar búsqueda general
             else:
@@ -806,6 +817,15 @@ def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
                     return True
                 if search_term_normalized in field_val_normalized:
                     logger.info(f"✅ Match normalizado de pediatría encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
+                    return True
+            # Para términos de ciudad, ser más estricto también
+            elif any(term in ["puente alto", "santiago", "providencia", "las condes", "ñuñoa", "maipú", "cerrillos", "estación central", "padre hurtado", "peñaflor", "el monte", "talagante", "isla de maipo", "independencia", "recoleta", "la reina", "vitacura", "lo barnechea", "macul", "peñalolén", "la florida", "san miguel", "la cisterna", "la granja", "la pintana", "pedro aguirre cerda"] for term in search_terms):
+                # Solo coincidir si el campo contiene exactamente la ciudad
+                if search_term in field_val:
+                    logger.info(f"✅ Match exacto de ciudad encontrado: '{search_term}' en '{field_val}'")
+                    return True
+                if search_term_normalized in field_val_normalized:
+                    logger.info(f"✅ Match normalizado de ciudad encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
                     return True
             else:
                 # Para otros términos, usar lógica más flexible
