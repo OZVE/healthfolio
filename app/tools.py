@@ -344,49 +344,54 @@ def normalize_age_group_search(age_group: str) -> List[str]:
     """
     Normaliza la búsqueda de grupos etarios para encontrar variaciones.
     Maneja términos como "pediatra", "niños", "adultos", etc.
+    AHORA INCLUYE MÁS VARIACIONES PARA PEDIATRÍA.
     """
     age_group_lower = age_group.lower().strip()
     
     # Mapeo de términos de búsqueda a grupos etarios reales
     age_group_mappings = {
-        # Pediatría/Niños
-        "pediatra": ["niños", "pediatría", "infantil"],
-        "pediatras": ["niños", "pediatría", "infantil"],
-        "pediatría": ["niños", "pediatría", "infantil"],
-        "pediatria": ["niños", "pediatría", "infantil"],
-        "niños": ["niños", "pediatría", "infantil"],
-        "niño": ["niños", "pediatría", "infantil"],
-        "niña": ["niños", "pediatría", "infantil"],
-        "niñas": ["niños", "pediatría", "infantil"],
-        "infantil": ["niños", "pediatría", "infantil"],
-        "bebé": ["niños", "pediatría", "infantil"],
-        "bebe": ["niños", "pediatría", "infantil"],
-        "bebés": ["niños", "pediatría", "infantil"],
-        "bebes": ["niños", "pediatría", "infantil"],
-        "chico": ["niños", "pediatría", "infantil"],
-        "chica": ["niños", "pediatría", "infantil"],
-        "chicos": ["niños", "pediatría", "infantil"],
-        "chicas": ["niños", "pediatría", "infantil"],
+        # Pediatría/Niños - MÁS VARIACIONES
+        "pediatra": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "pediatras": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "pediatría": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "pediatria": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "pediatrico": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "pediatrica": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "pediátrico": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "pediátrica": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "niños": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "niño": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "niña": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "niñas": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "infantil": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "bebé": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "bebe": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "bebés": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "bebes": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "chico": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "chica": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "chicos": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
+        "chicas": ["niños", "pediatría", "pediatria", "infantil", "adulto y pediatría"],
         
         # Adultos
-        "adulto": ["adulto"],
-        "adultos": ["adulto"],
-        "adulta": ["adulto"],
-        "adultas": ["adulto"],
+        "adulto": ["adulto", "adulto y pediatría"],
+        "adultos": ["adulto", "adulto y pediatría"],
+        "adulta": ["adulto", "adulto y pediatría"],
+        "adultas": ["adulto", "adulto y pediatría"],
         
         # Adultos mayores/Geriatría
-        "adulto mayor": ["adulto mayor", "geriatría", "tercera edad"],
-        "adultos mayores": ["adulto mayor", "geriatría", "tercera edad"],
-        "geriatría": ["adulto mayor", "geriatría", "tercera edad"],
-        "geriatria": ["adulto mayor", "geriatría", "tercera edad"],
-        "geriatra": ["adulto mayor", "geriatría", "tercera edad"],
-        "tercera edad": ["adulto mayor", "geriatría", "tercera edad"],
-        "anciano": ["adulto mayor", "geriatría", "tercera edad"],
-        "ancianos": ["adulto mayor", "geriatría", "tercera edad"],
-        "anciana": ["adulto mayor", "geriatría", "tercera edad"],
-        "ancianas": ["adulto mayor", "geriatría", "tercera edad"],
-        "mayor": ["adulto mayor", "geriatría", "tercera edad"],
-        "mayores": ["adulto mayor", "geriatría", "tercera edad"],
+        "adulto mayor": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "adultos mayores": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "geriatría": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "geriatria": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "geriatra": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "tercera edad": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "anciano": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "ancianos": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "anciana": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "ancianas": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "mayor": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
+        "mayores": ["adulto mayor", "geriatría", "geriatria", "tercera edad"],
         
         # Adolescentes
         "adolescente": ["adolescente"],
@@ -681,6 +686,7 @@ def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
     """
     Verifica si alguno de los términos de búsqueda está presente en un campo que puede contener múltiples valores.
     Maneja campos separados por punto y coma (;) correctamente.
+    AHORA TAMBIÉN MANEJA VARIACIONES CON Y SIN TILDES.
     
     Args:
         field_value: Valor del campo (puede contener múltiples valores separados por ;)
@@ -695,11 +701,32 @@ def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
     # También considerar el valor completo como una opción
     field_values.append(field_value.lower())
     
+    # Normalizar tildes para búsqueda más flexible
+    def normalize_text(text: str) -> str:
+        """Normaliza texto removiendo tildes para búsqueda más flexible."""
+        replacements = {
+            'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u', 'ü': 'u', 'ñ': 'n',
+            'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U', 'Ü': 'U', 'Ñ': 'N'
+        }
+        for accented, plain in replacements.items():
+            text = text.replace(accented, plain)
+        return text
+    
     # Verificar si alguno de los términos de búsqueda está en alguno de los valores del campo
     for search_term in search_terms:
+        search_term_normalized = normalize_text(search_term.lower())
+        
         for field_val in field_values:
+            field_val_normalized = normalize_text(field_val.lower())
+            
+            # Búsqueda exacta
             if search_term in field_val or field_val in search_term:
-                logger.info(f"✅ Match encontrado: '{search_term}' en '{field_val}'")
+                logger.info(f"✅ Match exacto encontrado: '{search_term}' en '{field_val}'")
+                return True
+            
+            # Búsqueda normalizada (sin tildes)
+            if search_term_normalized in field_val_normalized or field_val_normalized in search_term_normalized:
+                logger.info(f"✅ Match normalizado encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
                 return True
     
     return False
