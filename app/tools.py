@@ -48,7 +48,7 @@ SHEET_TAB = os.getenv("SHEET_TAB", "directory")
 def normalize_specialty_search(specialty: str) -> List[str]:
     """
     Genera variaciones comunes de especialidades médicas.
-    Esto complementa las instrucciones del system prompt.
+    ACTUALIZADO para manejar las especialidades reales de la base de datos.
     """
     specialty_lower = specialty.lower().strip()
     
@@ -67,112 +67,143 @@ def normalize_specialty_search(specialty: str) -> List[str]:
         variations.extend([base + "logo", base + "loga", base + "ólogo", base + "óloga"])
     
     # Mapeo basado en los datos REALES de la base de datos
-    # Títulos reales: Enfermera, Kinesiólogo, Médico, Nutricionista, TENS
-    # Especialidades reales: Atención Domiciliaria, Cardiología, Cuidados Intensivos, Geriatría, Oncología, Pediatría, Salud Mental, Traumatología, Urgencias
+    # Especialidades reales encontradas: Nutrición clínica, enfermedades crónicas, diabetes, hipertensión, dislipidemia, etc.
     
     specialty_mappings = {
-        # Kinesiología/Fisioterapia -> buscar título "Kinesiólogo"
+        # Nutrición -> buscar título "Nutricionista" y especialidades relacionadas
+        "nutrición": ["nutricionista", "nutrición clínica", "nutrición"],
+        "nutricion": ["nutricionista", "nutrición clínica", "nutrición"],
+        "nutricionista": ["nutricionista", "nutrición clínica", "nutrición"],
+        "nutrologo": ["nutricionista", "nutrición clínica", "nutrición"],
+        "nutrologa": ["nutricionista", "nutrición clínica", "nutrición"],
+        "dieta": ["nutricionista", "nutrición clínica", "nutrición"],
+        "alimentacion": ["nutricionista", "nutrición clínica", "nutrición"],
+        
+        # Diabetes -> buscar en especialidades
+        "diabetes": ["diabetes"],
+        "diabetico": ["diabetes"],
+        "diabético": ["diabetes"],
+        
+        # Hipertensión -> buscar en especialidades
+        "hipertensión": ["hipertensión"],
+        "hipertension": ["hipertensión"],
+        "presión alta": ["hipertensión"],
+        "presion alta": ["hipertensión"],
+        
+        # Enfermedades crónicas
+        "enfermedades crónicas": ["enfermedades crónicas"],
+        "enfermedades cronicas": ["enfermedades crónicas"],
+        "crónicas": ["enfermedades crónicas"],
+        "cronicas": ["enfermedades crónicas"],
+        
+        # Dislipidemia
+        "dislipidemia": ["dislipidemia"],
+        "colesterol": ["dislipidemia"],
+        "triglicéridos": ["dislipidemia"],
+        "trigliceridos": ["dislipidemia"],
+        
+        # Enfermedad renal
+        "renal": ["enfermedad renal"],
+        "riñón": ["enfermedad renal"],
+        "riñon": ["enfermedad renal"],
+        "nefrología": ["enfermedad renal"],
+        "nefrologia": ["enfermedad renal"],
+        
+        # Enfermedad hepática
+        "hepática": ["enfermedad hepática"],
+        "hepatica": ["enfermedad hepática"],
+        "hígado": ["enfermedad hepática"],
+        "higado": ["enfermedad hepática"],
+        
+        # Cáncer/Oncología
+        "cáncer": ["cáncer"],
+        "cancer": ["cáncer"],
+        "oncología": ["cáncer"],
+        "oncologia": ["cáncer"],
+        "oncologo": ["cáncer"],
+        "oncóloga": ["cáncer"],
+        
+        # Enfermedades autoinmunes
+        "autoinmunes": ["enfermedades autoinmunes"],
+        "autoinmune": ["enfermedades autoinmunes"],
+        "lupus": ["enfermedades autoinmunes"],
+        "artritis": ["enfermedades autoinmunes"],
+        
+        # Nutrición enteral/parenteral
+        "enteral": ["nutrición enteral"],
+        "parenteral": ["nutrición parenteral"],
+        "sonda": ["nutrición enteral"],
+        
+        # Colon irritable
+        "colon irritable": ["colon irritable"],
+        "síndrome del intestino irritable": ["colon irritable"],
+        "sindrome del intestino irritable": ["colon irritable"],
+        
+        # Celiaquía
+        "celiaquía": ["celiaquía"],
+        "celiaquia": ["celiaquía"],
+        "celíaco": ["celiaquía"],
+        "celiaco": ["celiaquía"],
+        "gluten": ["celiaquía"],
+        
+        # Embarazo y lactancia
+        "embarazo": ["embarazo"],
+        "lactancia": ["lactancia"],
+        "materno": ["embarazo", "lactancia"],
+        "materna": ["embarazo", "lactancia"],
+        
+        # Trastornos alimentarios
+        "anorexia": ["anorexia"],
+        "bulimia": ["bulimia"],
+        "trastornos alimentarios": ["anorexia", "bulimia"],
+        
+        # Nutrición vegetariana/vegana
+        "vegetariana": ["nutrición vegetariana"],
+        "vegetariano": ["nutrición vegetariana"],
+        "vegana": ["nutrición vegana"],
+        "vegano": ["nutrición vegana"],
+        
+        # Nutrición bariátrica
+        "bariátrica": ["nutrición bariátrica"],
+        "bariatrica": ["nutrición bariátrica"],
+        "obesidad": ["nutrición bariátrica"],
+        "pérdida de peso": ["nutrición bariátrica"],
+        "perdida de peso": ["nutrición bariátrica"],
+        
+        # Títulos profesionales (mantener compatibilidad)
         "kinesiología": ["kinesiólogo"],
         "kinesiologia": ["kinesiólogo"], 
         "kinesiologo": ["kinesiólogo"],
         "kinesiologa": ["kinesiólogo"],
         "kinesiólogo": ["kinesiólogo"],
         "kinesióloga": ["kinesiólogo"],
-        "kinesiologos": ["kinesiólogo"],
-        "kinesiólogos": ["kinesiólogo"],
         "fisioterapia": ["kinesiólogo"],
         "fisioterapeuta": ["kinesiólogo"],
-        "rehabilitacion": ["kinesiólogo"],
         
-        # Cardiología -> especialidad "Cardiología" + título "Médico"
         "cardiología": ["cardiología", "médico"],
         "cardiologia": ["cardiología", "médico"],
         "cardiologo": ["cardiología", "médico"],
         "cardióloga": ["cardiología", "médico"],
         "cardiólogo": ["cardiología", "médico"],
-        "corazón": ["cardiología", "médico"],
         
-        # Pediatría -> especialidad "Pediatría" + título "Médico"  
         "pediatría": ["pediatría", "médico"],
         "pediatria": ["pediatría", "médico"],
         "pediatra": ["pediatría", "médico"],
-        "pediatras": ["pediatría", "médico"],
         "niños": ["pediatría", "médico"],
         "niño": ["pediatría", "médico"],
         
-        # Nutrición -> título "Nutricionista"
-        "nutrición": ["nutricionista"],
-        "nutricion": ["nutricionista"],
-        "nutricionista": ["nutricionista"],
-        "nutrologo": ["nutricionista"],
-        "nutrologa": ["nutricionista"],
-        "dieta": ["nutricionista"],
-        "alimentacion": ["nutricionista"],
-        
-        # Enfermería -> título "Enfermera" + "TENS"
         "enfermería": ["enfermera", "tens"],
         "enfermeria": ["enfermera", "tens"],
         "enfermera": ["enfermera", "tens"],
         "enfermero": ["enfermera", "tens"],
         "tens": ["tens", "enfermera"],
         
-        # Medicina General -> título "Médico"
         "medicina general": ["médico"],
         "medico general": ["médico"],
         "medico": ["médico"],
         "médico": ["médico"],
         "doctor": ["médico"],
         "doctora": ["médico"],
-        
-        # Geriatría -> especialidad "Geriatría"
-        "geriatría": ["geriatría"],
-        "geriatria": ["geriatría"], 
-        "adulto mayor": ["geriatría"],
-        "tercera edad": ["geriatría"],
-        
-        # Traumatología -> especialidad "Traumatología"
-        "traumatología": ["traumatología"],
-        "traumatologia": ["traumatología"],
-        "traumatologo": ["traumatología"],
-        "traumatóloga": ["traumatología"],
-        "huesos": ["traumatología"],
-        "fracturas": ["traumatología"],
-        
-        # Oncología -> especialidad "Oncología"
-        "oncología": ["oncología"],
-        "oncologia": ["oncología"],
-        "oncologo": ["oncología"],
-        "oncóloga": ["oncología"],
-        "cancer": ["oncología"],
-        "cáncer": ["oncología"],
-        
-        # Salud Mental -> especialidad "Salud Mental"
-        "salud mental": ["salud mental"],
-        "psicología": ["salud mental"],
-        "psicologia": ["salud mental"],
-        "psicologo": ["salud mental"],
-        "psicologa": ["salud mental"],
-        "psiquiatra": ["salud mental"],
-        "depresion": ["salud mental"],
-        "ansiedad": ["salud mental"],
-        
-        # Urgencias -> especialidad "Urgencias"
-        "urgencias": ["urgencias"],
-        "urgencia": ["urgencias"],
-        "emergencia": ["urgencias"],
-        "emergencias": ["urgencias"],
-        
-        # Cuidados Intensivos -> especialidad "Cuidados Intensivos"
-        "cuidados intensivos": ["cuidados intensivos"],
-        "uci": ["cuidados intensivos"],
-        "intensivos": ["cuidados intensivos"],
-        
-        # Atención Domiciliaria -> especialidad "Atención Domiciliaria"
-        "atención domiciliaria": ["atención domiciliaria"],
-        "atencion domiciliaria": ["atención domiciliaria"],
-        "domiciliaria": ["atención domiciliaria"],
-        "domicilio": ["atención domiciliaria"],
-        "casa": ["atención domiciliaria"],
     }
     
     if specialty_lower in specialty_mappings:
@@ -463,6 +494,7 @@ def get_all_professionals_data() -> List[Dict]:
 def search_professionals_flexible(search_query: str, search_criteria: Dict[str, str] = None) -> List[Dict]:
     """
     Búsqueda flexible de profesionales que permite al agente determinar los criterios de búsqueda.
+    MANEJA CORRECTAMENTE campos con múltiples valores separados por punto y coma.
     
     Args:
         search_query: Consulta de búsqueda en lenguaje natural
@@ -522,13 +554,13 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         # Aplicar normalización inteligente según el tipo de campo
                         if criterion_key in ['specialty', 'title']:
                             search_terms = normalize_specialty_search(criterion_value)
-                            field_match = any(term in record_value for term in search_terms)
+                            field_match = check_multi_value_field(record_value, search_terms)
                         elif criterion_key in ['coverage_area', 'work_region']:
                             search_terms = normalize_city_search(criterion_value)
-                            field_match = any(term in record_value for term in search_terms)
+                            field_match = check_multi_value_field(record_value, search_terms)
                         elif criterion_key in ['availability_days', 'availability_hours']:
                             search_terms = normalize_availability_search(criterion_value)
-                            field_match = any(term in record_value for term in search_terms)
+                            field_match = check_multi_value_field(record_value, search_terms)
                         else:
                             # Búsqueda simple para otros campos (name, sis_number, age_group, phone, email)
                             field_match = search_value in record_value
@@ -551,6 +583,34 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
     except Exception as e:
         logger.error(f"❌ Error en búsqueda flexible: {str(e)}")
         return []
+
+
+def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
+    """
+    Verifica si alguno de los términos de búsqueda está presente en un campo que puede contener múltiples valores.
+    Maneja campos separados por punto y coma (;) correctamente.
+    
+    Args:
+        field_value: Valor del campo (puede contener múltiples valores separados por ;)
+        search_terms: Lista de términos a buscar
+    
+    Returns:
+        True si al menos un término coincide
+    """
+    # Separar el campo por punto y coma y limpiar espacios
+    field_values = [v.strip().lower() for v in field_value.split(';')]
+    
+    # También considerar el valor completo como una opción
+    field_values.append(field_value.lower())
+    
+    # Verificar si alguno de los términos de búsqueda está en alguno de los valores del campo
+    for search_term in search_terms:
+        for field_val in field_values:
+            if search_term in field_val or field_val in search_term:
+                logger.info(f"✅ Match encontrado: '{search_term}' en '{field_val}'")
+                return True
+    
+    return False
 
 
 def get_database_schema() -> Dict[str, Any]:
