@@ -589,6 +589,7 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
     Búsqueda flexible de profesionales que permite al agente determinar los criterios de búsqueda.
     MANEJA CORRECTAMENTE campos con múltiples valores separados por punto y coma.
     AHORA TAMBIÉN BUSCA EN age_group para términos relacionados con grupos etarios.
+    DETECTA AUTOMÁTICAMENTE términos de grupos etarios y usa búsqueda inteligente.
     
     Args:
         search_query: Consulta de búsqueda en lenguaje natural
@@ -614,24 +615,86 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
         
         matches = []
         
-        # Si no se proporcionan criterios específicos, hacer búsqueda en todos los campos
+        # Si no se proporcionan criterios específicos, hacer búsqueda inteligente
         if not search_criteria:
             search_terms = search_query.lower().split()
-            logger.info(f"🔍 Búsqueda general con términos: {search_terms}")
+            logger.info(f"🔍 Búsqueda inteligente con términos: {search_terms}")
             
-            for i, record in enumerate(rows):
-                # Buscar en todos los campos de texto del registro
-                record_text = ""
-                for key, value in record.items():
-                    if isinstance(value, str):
-                        record_text += f" {value.lower()}"
+            # Detectar si hay términos relacionados con grupos etarios
+            age_group_terms = []
+            specialty_terms = []
+            city_terms = []
+            
+            for term in search_terms:
+                # Verificar si es un término de grupo etario
+                age_variations = normalize_age_group_search(term)
+                if age_variations and age_variations != [term.lower()]:
+                    age_group_terms.extend(age_variations)
+                    logger.info(f"👥 Detectado término de grupo etario: '{term}' -> {age_variations}")
                 
-                # Verificar si algún término de búsqueda está en el registro
-                match_found = any(term in record_text for term in search_terms)
+                # Verificar si es un término de especialidad
+                specialty_variations = normalize_specialty_search(term)
+                if specialty_variations and specialty_variations != [term.lower()]:
+                    specialty_terms.extend(specialty_variations)
+                    logger.info(f"🏥 Detectado término de especialidad: '{term}' -> {specialty_variations}")
                 
-                if match_found:
-                    logger.info(f"✅ Match encontrado en registro {i+1}: {record.get('name', 'N/A')}")
-                    matches.append(record)
+                # Verificar si es un término de ciudad
+                city_variations = normalize_city_search(term)
+                if city_variations and city_variations != [term.lower()]:
+                    city_terms.extend(city_variations)
+                    logger.info(f"🏙️ Detectado término de ciudad: '{term}' -> {city_variations}")
+            
+            # Si detectamos términos específicos, usar búsqueda inteligente
+            if age_group_terms or specialty_terms or city_terms:
+                logger.info(f"🔍 Usando búsqueda inteligente con términos detectados")
+                
+                for i, record in enumerate(rows):
+                    match_found = True
+                    
+                    # Verificar términos de grupo etario
+                    if age_group_terms:
+                        age_group_value = str(record.get("age_group", "")).lower()
+                        age_match = check_multi_value_field(age_group_value, age_group_terms)
+                        if not age_match:
+                            match_found = False
+                    
+                    # Verificar términos de especialidad
+                    if specialty_terms and match_found:
+                        specialty_value = str(record.get("specialty", "")).lower()
+                        title_value = str(record.get("title", "")).lower()
+                        specialty_match = check_multi_value_field(specialty_value, specialty_terms) or check_multi_value_field(title_value, specialty_terms)
+                        if not specialty_match:
+                            match_found = False
+                    
+                    # Verificar términos de ciudad
+                    if city_terms and match_found:
+                        coverage_value = str(record.get("coverage_area", "")).lower()
+                        region_value = str(record.get("work_region", "")).lower()
+                        city_match = check_multi_value_field(coverage_value, city_terms) or check_multi_value_field(region_value, city_terms)
+                        if not city_match:
+                            match_found = False
+                    
+                    if match_found:
+                        logger.info(f"✅ Match inteligente encontrado en registro {i+1}: {record.get('name', 'N/A')}")
+                        matches.append(record)
+            
+            # Si no detectamos términos específicos, usar búsqueda general
+            else:
+                logger.info(f"🔍 Usando búsqueda general (no se detectaron términos específicos)")
+                
+                for i, record in enumerate(rows):
+                    # Buscar en todos los campos de texto del registro
+                    record_text = ""
+                    for key, value in record.items():
+                        if isinstance(value, str):
+                            record_text += f" {value.lower()}"
+                    
+                    # Verificar si algún término de búsqueda está en el registro
+                    match_found = any(term in record_text for term in search_terms)
+                    
+                    if match_found:
+                        logger.info(f"✅ Match general encontrado en registro {i+1}: {record.get('name', 'N/A')}")
+                        matches.append(record)
         
         else:
             # Búsqueda con criterios específicos
