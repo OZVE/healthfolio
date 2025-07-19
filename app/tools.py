@@ -853,17 +853,29 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
             logger.info(f"🔍 No se encontraron coincidencias con búsqueda inteligente, intentando búsqueda de respaldo")
             
             for i, record in enumerate(rows):
-                # Buscar en todos los campos de texto del registro
-                record_text = ""
-                for key, value in record.items():
-                    if isinstance(value, str):
-                        record_text += f" {value.lower()}"
+                # Para búsqueda de respaldo, verificar que se cumplan los criterios básicos
+                specialty_match = False
+                city_match = False
                 
-                # Verificar si algún término de búsqueda está en el registro
-                match_found = any(term in record_text for term in search_terms)
+                # Verificar especialidad
+                if specialty_terms:
+                    specialty_value = str(record.get("specialty", "")).lower()
+                    title_value = str(record.get("title", "")).lower()
+                    specialty_match = check_multi_value_field(specialty_value, specialty_terms) or check_multi_value_field(title_value, specialty_terms)
+                else:
+                    specialty_match = True  # Si no hay términos de especialidad, considerar como match
                 
-                if match_found:
-                    logger.debug(f"✅ Match de respaldo encontrado en registro {i+1}: {record.get('name', 'N/A')}")
+                # Verificar ciudad
+                if city_terms:
+                    coverage_value = str(record.get("coverage_area", "")).lower()
+                    region_value = str(record.get("work_region", "")).lower()
+                    city_match = check_multi_value_field(coverage_value, city_terms) or check_multi_value_field(region_value, city_terms)
+                else:
+                    city_match = True  # Si no hay términos de ciudad, considerar como match
+                
+                # Solo agregar si coinciden tanto especialidad como ciudad
+                if specialty_match and city_match:
+                    logger.debug(f"✅ Match de respaldo encontrado en registro {i+1}: {record.get('name', 'N/A')} - Especialidad y ciudad coinciden")
                     matches.append(record)
         
         logger.info(f"📋 Total matches encontrados: {len(matches)}")
@@ -923,7 +935,7 @@ def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
                     logger.debug(f"✅ Match normalizado de pediatría encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
                     return True
             # Para términos de ciudad, ser más estricto también
-            elif any(term in ["puente alto", "santiago", "providencia", "las condes", "ñuñoa", "maipú", "cerrillos", "estación central", "padre hurtado", "peñaflor", "el monte", "talagante", "isla de maipo", "independencia", "recoleta", "la reina", "vitacura", "lo barnechea", "macul", "peñalolén", "la florida", "san miguel", "la cisterna", "la granja", "la pintana", "pedro aguirre cerda"] for term in search_terms):
+            elif any(term in ["puente alto", "santiago", "providencia", "las condes", "los condes", "condes", "ñuñoa", "maipú", "cerrillos", "estación central", "padre hurtado", "peñaflor", "el monte", "talagante", "isla de maipo", "independencia", "recoleta", "la reina", "vitacura", "lo barnechea", "macul", "peñalolén", "la florida", "san miguel", "la cisterna", "la granja", "la pintana", "pedro aguirre cerda"] for term in search_terms):
                 # Solo coincidir si el campo contiene exactamente la ciudad
                 if search_term in field_val:
                     logger.debug(f"✅ Match exacto de ciudad encontrado: '{search_term}' en '{field_val}'")
