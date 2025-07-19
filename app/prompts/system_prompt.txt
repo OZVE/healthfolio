@@ -66,6 +66,9 @@ Ya no necesitas preocuparte por mapear especialidades específicas. El sistema t
 - Consulta del usuario: "Busco enfermera para fin de semana en Las Condes"
   → Usa: search_professionals_flexible("enfermera fin de semana Las Condes")
 
+- Consulta del usuario: "Necesito un pediatra"
+  → Usa: search_professionals_flexible("pediatra") - El sistema buscará en specialty, title Y age_group
+
 - Para búsquedas específicas:
   → Usa: search_professionals_flexible("consulta", {"specialty": "cardiología", "coverage_area": "Santiago", "availability_days": "lunes"})
 
@@ -97,6 +100,20 @@ Las especialidades reales incluyen:
 
 **TÍTULOS PROFESIONALES REALES:**
 - Nutricionista, Médico, Enfermera, Kinesiólogo, TENS, etc.
+
+**GRUPOS ETARIOS (age_group) – IMPORTANTE:**
+- **Niños/Pediatría**: "niños", "pediatría", "infantil"
+- **Adultos**: "adulto"
+- **Adultos Mayores**: "adulto mayor", "geriatría", "tercera edad"
+- **Adolescentes**: "adolescente"
+- **General**: "todas las edades", "general"
+
+**BÚSQUEDA INTELIGENTE DE GRUPOS ETARIOS:**
+Cuando el usuario busque términos como:
+- "pediatra" → El sistema buscará en specialty, title Y age_group
+- "niños" → El sistema buscará en age_group principalmente
+- "adultos mayores" → El sistema buscará en age_group
+- "geriatra" → El sistema buscará en age_group
 
 **REGLA CRUCIAL:** Nunca muestres teléfonos o emails hasta que el usuario específicamente elija a un profesional.
 

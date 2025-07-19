@@ -49,6 +49,7 @@ def normalize_specialty_search(specialty: str) -> List[str]:
     """
     Genera variaciones comunes de especialidades médicas.
     ACTUALIZADO para manejar las especialidades reales de la base de datos.
+    AHORA TAMBIÉN INCLUYE TÉRMINOS PARA BUSCAR EN age_group CUANDO ES RELEVANTE.
     """
     specialty_lower = specialty.lower().strip()
     
@@ -186,11 +187,24 @@ def normalize_specialty_search(specialty: str) -> List[str]:
         "cardióloga": ["cardiología", "médico"],
         "cardiólogo": ["cardiología", "médico"],
         
-        "pediatría": ["pediatría", "médico"],
-        "pediatria": ["pediatría", "médico"],
-        "pediatra": ["pediatría", "médico"],
-        "niños": ["pediatría", "médico"],
-        "niño": ["pediatría", "médico"],
+        # PEDIATRÍA - AHORA TAMBIÉN INCLUYE TÉRMINOS PARA age_group
+        "pediatría": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "pediatria": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "pediatra": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "pediatras": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "niños": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "niño": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "niña": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "niñas": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "infantil": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "bebé": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "bebe": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "bebés": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "bebes": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "chico": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "chica": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "chicos": ["pediatría", "médico", "niños", "pediatría", "infantil"],
+        "chicas": ["pediatría", "médico", "niños", "pediatría", "infantil"],
         
         "enfermería": ["enfermera", "tens"],
         "enfermeria": ["enfermera", "tens"],
@@ -325,6 +339,80 @@ def normalize_availability_search(availability: str) -> List[str]:
     
     logger.info(f"🕐 Variaciones de disponibilidad para '{availability}': {unique_variations}")
     return unique_variations
+
+def normalize_age_group_search(age_group: str) -> List[str]:
+    """
+    Normaliza la búsqueda de grupos etarios para encontrar variaciones.
+    Maneja términos como "pediatra", "niños", "adultos", etc.
+    """
+    age_group_lower = age_group.lower().strip()
+    
+    # Mapeo de términos de búsqueda a grupos etarios reales
+    age_group_mappings = {
+        # Pediatría/Niños
+        "pediatra": ["niños", "pediatría", "infantil"],
+        "pediatras": ["niños", "pediatría", "infantil"],
+        "pediatría": ["niños", "pediatría", "infantil"],
+        "pediatria": ["niños", "pediatría", "infantil"],
+        "niños": ["niños", "pediatría", "infantil"],
+        "niño": ["niños", "pediatría", "infantil"],
+        "niña": ["niños", "pediatría", "infantil"],
+        "niñas": ["niños", "pediatría", "infantil"],
+        "infantil": ["niños", "pediatría", "infantil"],
+        "bebé": ["niños", "pediatría", "infantil"],
+        "bebe": ["niños", "pediatría", "infantil"],
+        "bebés": ["niños", "pediatría", "infantil"],
+        "bebes": ["niños", "pediatría", "infantil"],
+        "chico": ["niños", "pediatría", "infantil"],
+        "chica": ["niños", "pediatría", "infantil"],
+        "chicos": ["niños", "pediatría", "infantil"],
+        "chicas": ["niños", "pediatría", "infantil"],
+        
+        # Adultos
+        "adulto": ["adulto"],
+        "adultos": ["adulto"],
+        "adulta": ["adulto"],
+        "adultas": ["adulto"],
+        
+        # Adultos mayores/Geriatría
+        "adulto mayor": ["adulto mayor", "geriatría", "tercera edad"],
+        "adultos mayores": ["adulto mayor", "geriatría", "tercera edad"],
+        "geriatría": ["adulto mayor", "geriatría", "tercera edad"],
+        "geriatria": ["adulto mayor", "geriatría", "tercera edad"],
+        "geriatra": ["adulto mayor", "geriatría", "tercera edad"],
+        "tercera edad": ["adulto mayor", "geriatría", "tercera edad"],
+        "anciano": ["adulto mayor", "geriatría", "tercera edad"],
+        "ancianos": ["adulto mayor", "geriatría", "tercera edad"],
+        "anciana": ["adulto mayor", "geriatría", "tercera edad"],
+        "ancianas": ["adulto mayor", "geriatría", "tercera edad"],
+        "mayor": ["adulto mayor", "geriatría", "tercera edad"],
+        "mayores": ["adulto mayor", "geriatría", "tercera edad"],
+        
+        # Adolescentes
+        "adolescente": ["adolescente"],
+        "adolescentes": ["adolescente"],
+        "joven": ["adolescente"],
+        "jóvenes": ["adolescente"],
+        "jovenes": ["adolescente"],
+        "teen": ["adolescente"],
+        "teenager": ["adolescente"],
+        
+        # General
+        "todas las edades": ["todas las edades", "general"],
+        "todas las edades": ["todas las edades", "general"],
+        "general": ["todas las edades", "general"],
+    }
+    
+    # Si el término está en el mapeo, usar esas variaciones
+    if age_group_lower in age_group_mappings:
+        variations = age_group_mappings[age_group_lower]
+    else:
+        # Si no está en el mapeo, usar el término original
+        variations = [age_group_lower]
+    
+    logger.info(f"👥 Variaciones de grupo etario para '{age_group}': {variations}")
+    return variations
+
 
 def find_professionals(specialty: str, city: str, availability: str = None) -> List[Dict]:
     """Busca filas que coincidan con especialidad, ciudad y opcionalmente disponibilidad."""
@@ -495,6 +583,7 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
     """
     Búsqueda flexible de profesionales que permite al agente determinar los criterios de búsqueda.
     MANEJA CORRECTAMENTE campos con múltiples valores separados por punto y coma.
+    AHORA TAMBIÉN BUSCA EN age_group para términos relacionados con grupos etarios.
     
     Args:
         search_query: Consulta de búsqueda en lenguaje natural
@@ -561,8 +650,11 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                         elif criterion_key in ['availability_days', 'availability_hours']:
                             search_terms = normalize_availability_search(criterion_value)
                             field_match = check_multi_value_field(record_value, search_terms)
+                        elif criterion_key == 'age_group':
+                            search_terms = normalize_age_group_search(criterion_value)
+                            field_match = check_multi_value_field(record_value, search_terms)
                         else:
-                            # Búsqueda simple para otros campos (name, sis_number, age_group, phone, email)
+                            # Búsqueda simple para otros campos (name, sis_number, phone, email)
                             field_match = search_value in record_value
                         
                         if not field_match:
