@@ -514,65 +514,107 @@ def find_professional_by_name(name: str) -> Dict:
         
         logger.info(f"🔍 Buscando en {len(rows)} registros...")
         
+        best_match = None
+        best_score = 0
+        
         for i, r in enumerate(rows):
             professional_name = str(r.get("name", "")).lower()
             search_name = name.lower().strip()
             
             logger.debug(f"🔍 Comparando: '{search_name}' con '{professional_name}' (registro {i+1})")
             
-            # Búsqueda más robusta
+            # Búsqueda más robusta y precisa
             name_match = False
+            match_score = 0
             
-            # 1. Búsqueda exacta
+            # 1. Búsqueda exacta (puntuación máxima)
             if search_name == professional_name:
                 name_match = True
+                match_score = 100
                 logger.debug(f"✅ Match exacto encontrado")
             
-            # 2. Búsqueda parcial (nombre en nombre completo)
+            # 2. Búsqueda por nombre completo (puntuación alta)
             elif search_name in professional_name:
                 name_match = True
+                match_score = 80
                 logger.debug(f"✅ Match parcial encontrado: '{search_name}' está en '{professional_name}'")
             
-            # 3. Búsqueda por apellido
-            elif any(apellido in professional_name for apellido in search_name.split()):
+            # 3. Búsqueda por apellidos (puntuación media)
+            search_words = search_name.split()
+            professional_words = professional_name.split()
+            
+            # Contar cuántas palabras coinciden
+            matching_words = 0
+            for search_word in search_words:
+                if any(search_word in prof_word for prof_word in professional_words):
+                    matching_words += 1
+            
+            # Si al menos 2 palabras coinciden, considerar como match
+            if matching_words >= 2:
                 name_match = True
-                logger.debug(f"✅ Match por apellido encontrado")
+                match_score = 60 + (matching_words * 10)
+                logger.debug(f"✅ Match por apellidos encontrado: {matching_words} palabras coinciden")
+            
+            # 4. Búsqueda por primer nombre (puntuación baja)
+            elif len(search_words) > 0 and search_words[0] in professional_words:
+                name_match = True
+                match_score = 40
+                logger.debug(f"✅ Match por primer nombre encontrado")
+            
+            # 5. Búsqueda por apellido único (puntuación muy baja)
+            elif len(search_words) == 1 and any(search_words[0] in prof_word for prof_word in professional_words):
+                # Solo considerar match si la palabra buscada tiene al menos 4 caracteres
+                if len(search_words[0]) >= 4:
+                    name_match = True
+                    match_score = 20
+                    logger.debug(f"✅ Match por apellido único encontrado")
             
             if name_match:
-                # Extraer información específica del profesional
-                availability_days = r.get("availability_days", "No especificado")
-                availability_hours = r.get("availability_hours", "No especificado")
-                specialty = r.get("specialty", "No especificada")
-                title = r.get("title", "No especificado")
-                coverage_area = r.get("coverage_area", "No especificada")
-                work_region = r.get("work_region", "No especificada")
-                age_group = r.get("age_group", "No especificado")
-                sis_number = r.get("sis_number", "No especificado")
-                
-                logger.info(f"✅ Profesional encontrado en fila {i+1}:")
-                logger.info(f"   📋 Nombre: {r.get('name', 'N/A')}")
-                logger.info(f"   🆔 Número SIS: {sis_number}")
-                logger.info(f"   🏥 Especialidad: {specialty}")
-                logger.info(f"   🎓 Título: {title}")
-                logger.info(f"   🌍 Región de trabajo: {work_region}")
-                logger.info(f"   📍 Área de cobertura: {coverage_area}")
-                logger.info(f"   👥 Grupo etario: {age_group}")
-                logger.info(f"   📅 Días disponibles: {availability_days}")
-                logger.info(f"   🕐 Horarios: {availability_hours}")
-                logger.info(f"   📞 Contacto: {r.get('phone', 'N/A')}")
-                logger.info(f"   📧 Email: {r.get('email', 'N/A')}")
-                
-                # Asegurar que los campos de disponibilidad estén incluidos en el resultado
-                if 'availability_days' not in r:
-                    logger.warning(f"⚠️ Columna 'availability_days' no encontrada en el registro")
-                    r['availability_days'] = "No especificado"
-                if 'availability_hours' not in r:
-                    logger.warning(f"⚠️ Columna 'availability_hours' no encontrada en el registro")
-                    r['availability_hours'] = "No especificado"
-                
-                return r
+                # Guardar el mejor match encontrado hasta ahora
+                if match_score > best_score:
+                    best_match = r
+                    best_score = match_score
+                    logger.debug(f"🔄 Nuevo mejor match: '{r.get('name', 'N/A')}' con puntuación {match_score}")
         
-        logger.info(f"❌ No se encontró profesional con nombre: '{name}'")
+        # Devolver el mejor match encontrado solo si tiene una puntuación mínima aceptable
+        if best_match and best_score >= 40:  # Mínimo 40 puntos para considerar válido
+            # Extraer información específica del profesional
+            availability_days = best_match.get("availability_days", "No especificado")
+            availability_hours = best_match.get("availability_hours", "No especificado")
+            specialty = best_match.get("specialty", "No especificada")
+            title = best_match.get("title", "No especificado")
+            coverage_area = best_match.get("coverage_area", "No especificada")
+            work_region = best_match.get("work_region", "No especificada")
+            age_group = best_match.get("age_group", "No especificado")
+            sis_number = best_match.get("sis_number", "No especificado")
+            
+            logger.info(f"✅ Mejor profesional encontrado con puntuación {best_score}:")
+            logger.info(f"   📋 Nombre: {best_match.get('name', 'N/A')}")
+            logger.info(f"   🆔 Número SIS: {sis_number}")
+            logger.info(f"   🏥 Especialidad: {specialty}")
+            logger.info(f"   🎓 Título: {title}")
+            logger.info(f"   🌍 Región de trabajo: {work_region}")
+            logger.info(f"   📍 Área de cobertura: {coverage_area}")
+            logger.info(f"   👥 Grupo etario: {age_group}")
+            logger.info(f"   📅 Días disponibles: {availability_days}")
+            logger.info(f"   🕐 Horarios: {availability_hours}")
+            logger.info(f"   📞 Contacto: {best_match.get('phone', 'N/A')}")
+            logger.info(f"   📧 Email: {best_match.get('email', 'N/A')}")
+            
+            # Asegurar que los campos de disponibilidad estén incluidos en el resultado
+            if 'availability_days' not in best_match:
+                logger.warning(f"⚠️ Columna 'availability_days' no encontrada en el registro")
+                best_match['availability_days'] = "No especificado"
+            if 'availability_hours' not in best_match:
+                logger.warning(f"⚠️ Columna 'availability_hours' no encontrada en el registro")
+                best_match['availability_hours'] = "No especificado"
+            
+            return best_match
+        
+        if best_match:
+            logger.info(f"❌ No se encontró profesional con nombre: '{name}' (mejor puntuación encontrada: {best_score}, mínimo requerido: 40)")
+        else:
+            logger.info(f"❌ No se encontró profesional con nombre: '{name}'")
         return {}
         
     except Exception as e:
