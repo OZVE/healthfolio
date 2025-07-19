@@ -218,6 +218,24 @@ def normalize_specialty_search(specialty: str) -> List[str]:
         "médico": ["médico"],
         "doctor": ["médico"],
         "doctora": ["médico"],
+        
+        # Vacunación y servicios de enfermería
+        "vacunación": ["vacunas", "inyecciones", "enfermero", "enfermera"],
+        "vacunacion": ["vacunas", "inyecciones", "enfermero", "enfermera"],
+        "vacuna": ["vacunas", "inyecciones", "enfermero", "enfermera"],
+        "vacunas": ["vacunas", "inyecciones", "enfermero", "enfermera"],
+        "inyección": ["inyecciones", "vacunas", "enfermero", "enfermera"],
+        "inyeccion": ["inyecciones", "vacunas", "enfermero", "enfermera"],
+        "inyecciones": ["inyecciones", "vacunas", "enfermero", "enfermera"],
+        
+        # Otros servicios de enfermería
+        "heridas": ["heridas", "enfermero", "enfermera"],
+        "ostomías": ["ostomías", "enfermero", "enfermera"],
+        "ostomias": ["ostomías", "enfermero", "enfermera"],
+        "sondas": ["sondas", "enfermero", "enfermera"],
+        "medicamentos": ["medicamentos", "enfermero", "enfermera"],
+        "educación": ["educación", "enfermero", "enfermera"],
+        "educacion": ["educación", "enfermero", "enfermera"],
     }
     
     if specialty_lower in specialty_mappings:
@@ -728,6 +746,8 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                     # Verificar términos de especialidad
                     if specialty_terms:
                         specialty_value = str(record.get("specialty", "")).lower()
+                        title_value = str(record.get("title", "")).lower()
+                        
                         # Para pediatría, solo buscar en specialty, no en title para evitar falsos positivos
                         if any(term in ["pediatría", "niños", "infantil"] for term in specialty_terms):
                             specialty_match = check_multi_value_field(specialty_value, specialty_terms)
@@ -735,8 +755,14 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                                 logger.debug(f"✅ Match de especialidad (pediatría) en registro {i+1}: {record.get('name', 'N/A')} - specialty: '{specialty_value}'")
                         else:
                             # Para otras especialidades, buscar en specialty y title
-                            title_value = str(record.get("title", "")).lower()
                             specialty_match = check_multi_value_field(specialty_value, specialty_terms) or check_multi_value_field(title_value, specialty_terms)
+                            
+                            # Para términos de vacunación, también buscar específicamente en title para encontrar enfermeros
+                            if any(term in ["vacunas", "vacuna", "vacunación", "vacunacion", "inyecciones", "inyección", "inyeccion"] for term in specialty_terms):
+                                if "enfermero" in title_value or "enfermera" in title_value:
+                                    specialty_match = True
+                                    logger.debug(f"✅ Match de vacunación por título en registro {i+1}: {record.get('name', 'N/A')} - title: '{title_value}'")
+                            
                             if specialty_match:
                                 logger.debug(f"✅ Match de especialidad en registro {i+1}: {record.get('name', 'N/A')} - specialty: '{specialty_value}', title: '{title_value}'")
                     
@@ -820,6 +846,24 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                 
                 if match_found:
                     logger.debug(f"✅ Match con criterios específicos en registro {i+1}: {record.get('name', 'N/A')}")
+                    matches.append(record)
+        
+        # Si no se encontraron coincidencias con búsqueda inteligente, hacer búsqueda de respaldo
+        if len(matches) == 0 and (age_group_terms or specialty_terms or city_terms):
+            logger.info(f"🔍 No se encontraron coincidencias con búsqueda inteligente, intentando búsqueda de respaldo")
+            
+            for i, record in enumerate(rows):
+                # Buscar en todos los campos de texto del registro
+                record_text = ""
+                for key, value in record.items():
+                    if isinstance(value, str):
+                        record_text += f" {value.lower()}"
+                
+                # Verificar si algún término de búsqueda está en el registro
+                match_found = any(term in record_text for term in search_terms)
+                
+                if match_found:
+                    logger.debug(f"✅ Match de respaldo encontrado en registro {i+1}: {record.get('name', 'N/A')}")
                     matches.append(record)
         
         logger.info(f"📋 Total matches encontrados: {len(matches)}")
