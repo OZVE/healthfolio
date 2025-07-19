@@ -238,12 +238,20 @@ def process(user_input: str, chat_id: str) -> str:
     logger.info(f"💬 Final response length: {len(final_text)} characters")
     logger.info(f"💬 Final response preview: {final_text[:200]}...")
     
+    # Preparar mensajes para guardar en memoria
     messages_to_save = (
         history[-8:] + [
             {"role": "user", "content": user_input},
             {"role": "assistant", "content": final_text},
         ]
     )[-20:]
+    
+    logger.info(f"📝 Preparando mensajes para memoria:")
+    logger.info(f"   - Historia anterior: {len(history)} mensajes")
+    logger.info(f"   - Mensaje del usuario: '{user_input[:50]}...'")
+    logger.info(f"   - Respuesta del asistente: '{final_text[:50]}...'")
+    logger.info(f"   - Total a guardar: {len(messages_to_save)} mensajes")
+    
     set_memory(chat_id, messages_to_save)
-    logger.info(f"💾 Saved {len(messages_to_save)} messages to memory")
+    logger.info(f"💾 Memoria actualizada para chat_id: {chat_id}")
     return final_text

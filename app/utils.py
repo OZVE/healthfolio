@@ -59,43 +59,60 @@ def extract_text_from_twilio_event(form_data: Dict[str, Any]) -> str | None:
 def get_chat_id(event: Dict[str, Any]) -> str:
     """Extrae el número E164 de remoteJid."""
     remote = event.get("data", {}).get("key", {}).get("remoteJid", "")
-    return remote.split("@")[0]
+    chat_id = remote.split("@")[0]
+    logger.info(f"📱 Chat ID extraído de Evolution: '{remote}' -> '{chat_id}'")
+    return chat_id
 
 
 def get_twilio_chat_id(form_data: Dict[str, Any]) -> str:
     """Extrae el número de teléfono del webhook de Twilio."""
     from_number = form_data.get("From", "")
     # Remover el prefijo "whatsapp:" si está presente
-    return from_number.replace("whatsapp:", "").replace("+", "")
+    chat_id = from_number.replace("whatsapp:", "").replace("+", "")
+    logger.info(f"📱 Chat ID extraído de Twilio: '{from_number}' -> '{chat_id}'")
+    return chat_id
 
 
 def get_memory(chat_id: str) -> List[Dict]:
     key = f"mem:{chat_id}"
+    logger.info(f"🔍 Obteniendo memoria para chat_id: '{chat_id}' (key: '{key}')")
     
     if redis_client:
         try:
             data = redis_client.get(key)
-            return json.loads(data) if data else []
+            if data:
+                history = json.loads(data)
+                logger.info(f"✅ Memoria recuperada de Redis: {len(history)} mensajes")
+                return history
+            else:
+                logger.info(f"📭 No hay memoria en Redis para key: '{key}'")
+                return []
         except Exception as e:
-            logger.error(f"Error obteniendo memoria de Redis: {e}")
+            logger.error(f"❌ Error obteniendo memoria de Redis: {e}")
             
     # Fallback a memoria en RAM
-    return memory_fallback.get(key, [])
+    history = memory_fallback.get(key, [])
+    logger.info(f"🔄 Usando memoria en RAM: {len(history)} mensajes")
+    return history
 
 
 def set_memory(chat_id: str, messages: List[Dict]):
     key = f"mem:{chat_id}"
+    logger.info(f"💾 Guardando memoria para chat_id: '{chat_id}' (key: '{key}') - {len(messages)} mensajes")
     
     if redis_client:
         try:
             redis_client.setex(key, 14 * 24 * 3600, json.dumps(messages))
+            logger.info(f"✅ Memoria guardada en Redis exitosamente")
             return
         except Exception as e:
-            logger.error(f"Error guardando memoria en Redis: {e}")
+            logger.error(f"❌ Error guardando memoria en Redis: {e}")
             
     # Fallback a memoria en RAM
     memory_fallback[key] = messages
+    logger.info(f"🔄 Memoria guardada en RAM (total de chats: {len(memory_fallback)})")
     # Limpiar memoria vieja (mantener solo 100 chats)
     if len(memory_fallback) > 100:
         oldest_key = next(iter(memory_fallback))
         del memory_fallback[oldest_key]
+        logger.info(f"🧹 Memoria vieja limpiada: {oldest_key}")
