@@ -517,7 +517,29 @@ def find_professional_by_name(name: str) -> Dict:
         
         for i, r in enumerate(rows):
             professional_name = str(r.get("name", "")).lower()
-            if name.lower() in professional_name or professional_name in name.lower():
+            search_name = name.lower().strip()
+            
+            logger.info(f"🔍 Comparando: '{search_name}' con '{professional_name}' (registro {i+1})")
+            
+            # Búsqueda más robusta
+            name_match = False
+            
+            # 1. Búsqueda exacta
+            if search_name == professional_name:
+                name_match = True
+                logger.info(f"✅ Match exacto encontrado")
+            
+            # 2. Búsqueda parcial (nombre en nombre completo)
+            elif search_name in professional_name:
+                name_match = True
+                logger.info(f"✅ Match parcial encontrado: '{search_name}' está en '{professional_name}'")
+            
+            # 3. Búsqueda por apellido
+            elif any(apellido in professional_name for apellido in search_name.split()):
+                name_match = True
+                logger.info(f"✅ Match por apellido encontrado")
+            
+            if name_match:
                 # Extraer información específica del profesional
                 availability_days = r.get("availability_days", "No especificado")
                 availability_hours = r.get("availability_hours", "No especificado")
