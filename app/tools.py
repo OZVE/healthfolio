@@ -798,15 +798,25 @@ def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
         for field_val in field_values:
             field_val_normalized = normalize_text(field_val.lower())
             
-            # Búsqueda exacta
-            if search_term in field_val or field_val in search_term:
-                logger.info(f"✅ Match exacto encontrado: '{search_term}' en '{field_val}'")
-                return True
-            
-            # Búsqueda normalizada (sin tildes)
-            if search_term_normalized in field_val_normalized or field_val_normalized in search_term_normalized:
-                logger.info(f"✅ Match normalizado encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
-                return True
+            # Para términos de pediatría, ser más estricto
+            if any(term in ["pediatría", "niños", "infantil", "adulto y pediatría"] for term in search_terms):
+                # Solo coincidir si el campo contiene exactamente los términos de pediatría
+                if search_term in field_val:
+                    logger.info(f"✅ Match exacto de pediatría encontrado: '{search_term}' en '{field_val}'")
+                    return True
+                if search_term_normalized in field_val_normalized:
+                    logger.info(f"✅ Match normalizado de pediatría encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
+                    return True
+            else:
+                # Para otros términos, usar lógica más flexible
+                if search_term in field_val or field_val in search_term:
+                    logger.info(f"✅ Match exacto encontrado: '{search_term}' en '{field_val}'")
+                    return True
+                
+                # Búsqueda normalizada (sin tildes)
+                if search_term_normalized in field_val_normalized or field_val_normalized in search_term_normalized:
+                    logger.info(f"✅ Match normalizado encontrado: '{search_term}' (normalizado: '{search_term_normalized}') en '{field_val}' (normalizado: '{field_val_normalized}')")
+                    return True
     
     return False
 
