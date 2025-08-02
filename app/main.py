@@ -257,7 +257,7 @@ async def webhook_twilio(
         return PlainTextResponse("Error", status_code=500)
 
 
-async def send_whatsapp_message(to_number: str, text: str, show_typing: bool = True):
+async def send_whatsapp_message(to_number: str, text: str, show_typing: bool = False):
     """Envía mensaje usando el proveedor configurado."""
     if WHATSAPP_PROVIDER == "twilio":
         success = await send_twilio_whatsapp_message(to_number, text, show_typing)
@@ -286,17 +286,32 @@ async def process_message_with_batching(chat_id: str, user_text: str):
             error_message = "Lo siento, hubo un error procesando tu mensaje. ¿Podrías intentarlo de nuevo?"
             await send_whatsapp_message(chat_id, error_message)
     
+    # Verificar si es el primer mensaje del batch (para mostrar typing inmediatamente)
+    is_first_message = chat_id not in message_batcher.batches
+    
     # Agregar mensaje al batch
     was_batched = message_batcher.add_message(chat_id, user_text, process_combined_message)
     
     if was_batched:
         logger.info(f"📦 Mensaje agregado al batch para {chat_id}, esperando más mensajes...")
-        # No enviar respuesta inmediata, esperar el batch
+        
+        # Si es el primer mensaje, mostrar indicador de typing inmediatamente
+        if is_first_message:
+            logger.info(f"⌨️ Mostrando indicador de typing inmediatamente para {chat_id}")
+            try:
+                # Enviar indicador visual de typing (sin esperar respuesta de IA)
+                if WHATSAPP_PROVIDER == "evolution":
+                    await send_evolution_typing_indicator(chat_id, "Procesando tu mensaje...")
+                else:
+                    await send_typing_indicator(chat_id, 3)
+                logger.info(f"✅ Indicador de typing enviado para {chat_id}")
+            except Exception as e:
+                logger.error(f"❌ Error enviando indicador de typing: {str(e)}")
     else:
         logger.info(f"🚀 Mensaje procesado inmediatamente para {chat_id}")
 
 
-async def send_evolution_message(to_number: str, text: str, show_typing: bool = True):
+async def send_evolution_message(to_number: str, text: str, show_typing: bool = False):
     """Envía mensaje usando Evolution API - Código simplificado y directo."""
     if not (EVO_URL and INSTANCE_ID):
         raise Exception("Evolution API not properly configured")
@@ -306,9 +321,8 @@ async def send_evolution_message(to_number: str, text: str, show_typing: bool = 
     if not to_number.startswith("+"):
         formatted_number = "+" + to_number
     
-    # Mostrar indicador de "escribiendo..." si está habilitado
-    if show_typing:
-        await send_evolution_typing_indicator(formatted_number, text)
+    # NOTA: show_typing ahora es False por defecto porque el indicador se envía inmediatamente
+    # cuando llega el primer mensaje, no cuando se procesa la respuesta
     
     # Endpoint correcto según documentación oficial de Evolution API
     url = f"{EVO_URL}/message/sendText/{INSTANCE_ID}"
