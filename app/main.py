@@ -377,8 +377,8 @@ async def send_evolution_typing_indicator(to_number: str, message: str):
         logger.info(f"⌨️ Enviando indicador visual de 'escribiendo...' a {to_number} por {typing_duration} segundos")
         
         # Evolution API no tiene endpoints de typing indicator nativos
-        # Implementamos una solución visual: enviar un mensaje temporal con emojis de typing
-        typing_message = "⌨️ escribiendo..."
+        # Implementamos una solución visual: enviar un mensaje temporal
+        typing_message = "escribiendo..."
         
         # Enviar mensaje de typing
         await send_evolution_message_internal(to_number, typing_message, show_typing=False)
@@ -386,8 +386,8 @@ async def send_evolution_typing_indicator(to_number: str, message: str):
         # Esperar el tiempo calculado
         await asyncio.sleep(typing_duration)
         
-        # Enviar mensaje para "borrar" el typing (espacios en blanco)
-        await send_evolution_message_internal(to_number, "⠀", show_typing=False)  # Carácter invisible
+        # NOTA: No enviamos mensaje vacío para "borrar" - el mensaje de typing permanece
+        # y será reemplazado por la respuesta real del bot
         
         logger.info("✅ Indicador visual de typing completado")
                 
