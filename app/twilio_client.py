@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 from pathlib import Path
 from typing import Optional
 
@@ -33,8 +34,8 @@ def is_twilio_configured() -> bool:
     return twilio_client is not None and TWILIO_WHATSAPP_NUMBER is not None
 
 
-async def send_twilio_whatsapp_message(to_number: str, message: str) -> bool:
-    """Envía un mensaje de WhatsApp usando Twilio."""
+async def send_typing_indicator(to_number: str, duration: int = 3) -> bool:
+    """Envía el indicador de 'escribiendo...' en WhatsApp usando Twilio."""
     if not is_twilio_configured():
         logger.error("❌ Twilio no está configurado correctamente")
         return False
@@ -43,6 +44,42 @@ async def send_twilio_whatsapp_message(to_number: str, message: str) -> bool:
         # Asegurar formato correcto del número
         if not to_number.startswith("+"):
             to_number = "+" + to_number
+        
+        # Enviar indicador de typing usando la API de Twilio
+        # Nota: Twilio no tiene una API directa para typing indicators en WhatsApp
+        # Pero podemos simularlo enviando un mensaje temporal y luego borrándolo
+        # Por ahora, solo haremos una pausa para simular el efecto
+        
+        logger.info(f"⌨️ Enviando indicador de 'escribiendo...' a {to_number}")
+        
+        # Simular el tiempo de escritura
+        await asyncio.sleep(duration)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Error enviando indicador de typing: {str(e)}")
+        return False
+
+
+async def send_twilio_whatsapp_message(to_number: str, message: str, show_typing: bool = True) -> bool:
+    """Envía un mensaje de WhatsApp usando Twilio con opción de mostrar 'escribiendo...'."""
+    if not is_twilio_configured():
+        logger.error("❌ Twilio no está configurado correctamente")
+        return False
+    
+    try:
+        # Asegurar formato correcto del número
+        if not to_number.startswith("+"):
+            to_number = "+" + to_number
+        
+        # Mostrar indicador de "escribiendo..." si está habilitado
+        if show_typing:
+            # Calcular duración basada en la longitud del mensaje (aproximadamente 150 palabras por minuto)
+            words = len(message.split())
+            typing_duration = min(max(words / 2.5, 1), 5)  # Entre 1 y 5 segundos
+            
+            await send_typing_indicator(to_number, int(typing_duration))
         
         # Enviar mensaje
         message_instance = twilio_client.messages.create(

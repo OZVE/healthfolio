@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import asyncio
 from pathlib import Path
 from typing import Dict, Any
 
@@ -230,10 +231,10 @@ async def webhook_twilio(
         return PlainTextResponse("Error", status_code=500)
 
 
-async def send_whatsapp_message(to_number: str, text: str):
+async def send_whatsapp_message(to_number: str, text: str, show_typing: bool = True):
     """Envía mensaje usando el proveedor configurado."""
     if WHATSAPP_PROVIDER == "twilio":
-        success = await send_twilio_whatsapp_message(to_number, text)
+        success = await send_twilio_whatsapp_message(to_number, text, show_typing)
         if not success:
             raise Exception("Failed to send message via Twilio")
     else:  # evolution
@@ -269,7 +270,7 @@ async def process_message_with_batching(chat_id: str, user_text: str):
         logger.info(f"🚀 Mensaje procesado inmediatamente para {chat_id}")
 
 
-async def send_evolution_message(to_number: str, text: str):
+async def send_evolution_message(to_number: str, text: str, show_typing: bool = True):
     """Envía mensaje usando Evolution API - Código simplificado y directo."""
     if not (EVO_URL and INSTANCE_ID):
         raise Exception("Evolution API not properly configured")
@@ -278,6 +279,10 @@ async def send_evolution_message(to_number: str, text: str):
     formatted_number = to_number
     if not to_number.startswith("+"):
         formatted_number = "+" + to_number
+    
+    # Mostrar indicador de "escribiendo..." si está habilitado
+    if show_typing:
+        await send_evolution_typing_indicator(formatted_number, text)
     
     # Endpoint correcto según documentación oficial de Evolution API
     url = f"{EVO_URL}/message/sendText/{INSTANCE_ID}"
@@ -316,3 +321,49 @@ async def send_evolution_message(to_number: str, text: str):
     except Exception as e:
         logger.error(f"Failed to send message: {str(e)}")
         raise Exception(f"Evolution API request failed: {str(e)}")
+
+
+async def send_evolution_typing_indicator(to_number: str, message: str):
+    """Envía el indicador de 'escribiendo...' usando Evolution API."""
+    if not (EVO_URL and INSTANCE_ID):
+        logger.error("❌ Evolution API no está configurado correctamente")
+        return
+    
+    try:
+        # Calcular duración basada en la longitud del mensaje (aproximadamente 150 palabras por minuto)
+        words = len(message.split())
+        typing_duration = min(max(words / 2.5, 1), 5)  # Entre 1 y 5 segundos
+        
+        logger.info(f"⌨️ Enviando indicador de 'escribiendo...' a {to_number} por {typing_duration} segundos")
+        
+        # Evolution API tiene un endpoint específico para typing indicators
+        url = f"{EVO_URL}/chat/sendTyping/{INSTANCE_ID}"
+        
+        headers = {
+            "Content-Type": "application/json",
+            "apikey": EVOLUTION_API_KEY
+        }
+        
+        payload = {
+            "number": to_number,
+            "duration": int(typing_duration * 1000)  # Convertir a milisegundos
+        }
+        
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            
+            if response.status_code in [200, 201]:
+                logger.info("✅ Typing indicator enviado exitosamente")
+                # Esperar un poco para que el usuario vea el indicador
+                await asyncio.sleep(typing_duration)
+            else:
+                logger.warning(f"⚠️ No se pudo enviar typing indicator: {response.status_code}")
+                # Simular el tiempo de escritura de todas formas
+                await asyncio.sleep(typing_duration)
+                
+    except Exception as e:
+        logger.error(f"❌ Error enviando typing indicator: {str(e)}")
+        # Simular el tiempo de escritura de todas formas
+        words = len(message.split())
+        typing_duration = min(max(words / 2.5, 1), 5)
+        await asyncio.sleep(typing_duration)
