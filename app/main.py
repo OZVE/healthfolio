@@ -360,21 +360,70 @@ async def send_evolution_typing_indicator(to_number: str, message: str):
         words = len(message.split())
         typing_duration = min(max(words / 2.5, 1), 5)  # Entre 1 y 5 segundos
         
-        logger.info(f"⌨️ Simulando indicador de 'escribiendo...' a {to_number} por {typing_duration} segundos")
+        logger.info(f"⌨️ Enviando indicador visual de 'escribiendo...' a {to_number} por {typing_duration} segundos")
         
-        # Evolution API no tiene endpoints de typing indicator disponibles
-        # Por lo tanto, solo simulamos el tiempo de escritura
-        logger.info("ℹ️ Evolution API no soporta typing indicators nativos, usando simulación")
+        # Evolution API no tiene endpoints de typing indicator nativos
+        # Implementamos una solución visual: enviar un mensaje temporal con emojis de typing
+        typing_message = "⌨️ escribiendo..."
         
-        # Simular el tiempo de escritura
+        # Enviar mensaje de typing
+        await send_evolution_message_internal(to_number, typing_message, show_typing=False)
+        
+        # Esperar el tiempo calculado
         await asyncio.sleep(typing_duration)
-        logger.info("✅ Simulación de typing indicator completada")
+        
+        # Enviar mensaje para "borrar" el typing (espacios en blanco)
+        await send_evolution_message_internal(to_number, "⠀", show_typing=False)  # Carácter invisible
+        
+        logger.info("✅ Indicador visual de typing completado")
                 
     except Exception as e:
-        logger.error(f"❌ Error en simulación de typing indicator: {str(e)}")
+        logger.error(f"❌ Error en indicador visual de typing: {str(e)}")
         # Simular el tiempo de escritura de todas formas
         words = len(message.split())
         typing_duration = min(max(words / 2.5, 1), 5)
         await asyncio.sleep(typing_duration)
+
+
+async def send_evolution_message_internal(to_number: str, text: str, show_typing: bool = False):
+    """Envía mensaje usando Evolution API (función interna sin typing)."""
+    if not (EVO_URL and INSTANCE_ID):
+        raise Exception("Evolution API not properly configured")
+    
+    # Formatear número para Evolution API
+    formatted_number = to_number
+    if not to_number.startswith("+"):
+        formatted_number = "+" + to_number
+    
+    # Endpoint correcto según documentación oficial de Evolution API
+    url = f"{EVO_URL}/message/sendText/{INSTANCE_ID}"
+    
+    # Headers correctos
+    headers = {
+        "Content-Type": "application/json",
+        "apikey": EVOLUTION_API_KEY
+    }
+    
+    # Payload simple y directo
+    payload = {
+        "number": formatted_number,
+        "text": text[:4096]
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"✅ Mensaje interno enviado: {text[:50]}...")
+                return
+            else:
+                error_msg = f"Evolution API error: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
+                
+    except Exception as e:
+        logger.error(f"Failed to send internal message: {str(e)}")
+        raise Exception(f"Evolution API request failed: {str(e)}")
 
 
