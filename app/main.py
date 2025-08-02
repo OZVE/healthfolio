@@ -20,6 +20,7 @@ from .utils import (
 )
 from .twilio_client import (
     send_twilio_whatsapp_message, 
+    send_typing_indicator,
     create_twilio_response, 
     validate_twilio_webhook,
     is_twilio_configured
@@ -142,6 +143,31 @@ async def root():
         "status": "active",
         "provider": WHATSAPP_PROVIDER
     }
+
+
+@app.post("/test/typing")
+async def test_typing_indicator(request: Request):
+    """Endpoint de prueba para testing del typing indicator."""
+    try:
+        data = await request.json()
+        to_number = data.get("number")
+        message = data.get("message", "Mensaje de prueba")
+        
+        if not to_number:
+            return {"error": "Se requiere el número de teléfono"}
+        
+        logger.info(f"🧪 Testing typing indicator para {to_number}")
+        
+        if WHATSAPP_PROVIDER == "evolution":
+            await send_evolution_typing_indicator(to_number, message)
+            return {"success": True, "message": "Typing indicator enviado (Evolution API)"}
+        else:
+            await send_typing_indicator(to_number, 3)
+            return {"success": True, "message": "Typing indicator enviado (Twilio)"}
+            
+    except Exception as e:
+        logger.error(f"Error en test typing: {str(e)}")
+        return {"error": str(e)}
 
 
 @app.post("/webhook", status_code=200)
@@ -334,36 +360,21 @@ async def send_evolution_typing_indicator(to_number: str, message: str):
         words = len(message.split())
         typing_duration = min(max(words / 2.5, 1), 5)  # Entre 1 y 5 segundos
         
-        logger.info(f"⌨️ Enviando indicador de 'escribiendo...' a {to_number} por {typing_duration} segundos")
+        logger.info(f"⌨️ Simulando indicador de 'escribiendo...' a {to_number} por {typing_duration} segundos")
         
-        # Evolution API tiene un endpoint específico para typing indicators
-        url = f"{EVO_URL}/chat/sendTyping/{INSTANCE_ID}"
+        # Evolution API no tiene endpoints de typing indicator disponibles
+        # Por lo tanto, solo simulamos el tiempo de escritura
+        logger.info("ℹ️ Evolution API no soporta typing indicators nativos, usando simulación")
         
-        headers = {
-            "Content-Type": "application/json",
-            "apikey": EVOLUTION_API_KEY
-        }
-        
-        payload = {
-            "number": to_number,
-            "duration": int(typing_duration * 1000)  # Convertir a milisegundos
-        }
-        
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            
-            if response.status_code in [200, 201]:
-                logger.info("✅ Typing indicator enviado exitosamente")
-                # Esperar un poco para que el usuario vea el indicador
-                await asyncio.sleep(typing_duration)
-            else:
-                logger.warning(f"⚠️ No se pudo enviar typing indicator: {response.status_code}")
-                # Simular el tiempo de escritura de todas formas
-                await asyncio.sleep(typing_duration)
+        # Simular el tiempo de escritura
+        await asyncio.sleep(typing_duration)
+        logger.info("✅ Simulación de typing indicator completada")
                 
     except Exception as e:
-        logger.error(f"❌ Error enviando typing indicator: {str(e)}")
+        logger.error(f"❌ Error en simulación de typing indicator: {str(e)}")
         # Simular el tiempo de escritura de todas formas
         words = len(message.split())
         typing_duration = min(max(words / 2.5, 1), 5)
         await asyncio.sleep(typing_duration)
+
+
