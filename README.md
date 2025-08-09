@@ -8,6 +8,7 @@ Agente de IA con Model‑Context Protocol que opera en WhatsApp mediante **Evolu
 - ✅ **Configuración Flexible**: Cambio fácil entre proveedores
 - ✅ **Diagnóstico Avanzado**: Herramientas mejoradas de debugging
 - ✅ **Webhooks Separados**: Endpoints específicos por proveedor
+- ✅ **Soporte de Notas de Voz**: Transcripción automática con OpenAI Whisper
 
 ## ⚡ Ejecución Rápida
 
@@ -74,6 +75,9 @@ TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
 # === OPENAI ===
 OPENAI_API_KEY=sk-tu_openai_key_aqui
 OPENAI_MODEL=gpt-4o-mini
+
+# === AUDIO (NOTAS DE VOZ) ===
+AUDIO_TRANSCRIPTION_MODEL=whisper-1
 
 # === GOOGLE SHEETS ===
 GOOGLE_SERVICE_ACCOUNT_JSON=./service-account.json
@@ -148,6 +152,13 @@ curl http://localhost:8000/
 | `POST /batches/{chat_id}/force` | Ambos | Forzar procesamiento de batch |
 | `POST /webhook` | Evolution API | Webhook para Evolution API |
 | `POST /webhook/twilio` | Twilio | Webhook para Twilio WhatsApp |
+
+## 🎙️ **Notas de Voz (Voice Notes)**
+
+- Envía una nota de voz por WhatsApp y el bot la transcribe automáticamente y la procesa igual que un mensaje de texto (incluye batching y estilo de respuesta).
+- Requisitos: `OPENAI_API_KEY` configurada. Modelo configurable con `AUDIO_TRANSCRIPTION_MODEL` (por defecto `whisper-1`).
+- Proveedores: Evolution y Twilio soportados. Descarga de media autenticada (Twilio con SID/TOKEN, Evolution con `apikey`).
+- Formatos habituales: `audio/ogg` (WhatsApp). Tamaño recomendado: ≤ 25 MB.
 
 ## 🔀 **Cambio Entre Proveedores**
 

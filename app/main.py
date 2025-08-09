@@ -12,12 +12,16 @@ from fastapi.responses import PlainTextResponse
 
 from .mcp_gateway import process
 from .utils import (
-    extract_text_from_event, 
-    get_chat_id, 
-    extract_text_from_twilio_event, 
+    extract_text_from_event,
+    extract_audio_from_event,
+    get_chat_id,
+    extract_text_from_twilio_event,
+    extract_audio_from_twilio_event,
     get_twilio_chat_id,
-    message_batcher
+    message_batcher,
 )
+import openai
+from io import BytesIO
 from .twilio_client import (
     send_twilio_whatsapp_message, 
     send_typing_indicator,
@@ -50,6 +54,8 @@ INSTANCE_ID = os.getenv("EVOLUTION_INSTANCE_ID")
 WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "evolution").lower()
 
 logger.info(f"📱 Proveedor de WhatsApp: {WHATSAPP_PROVIDER}")
+TRANSCRIPTION_MODEL = os.getenv("AUDIO_TRANSCRIPTION_MODEL", "whisper-1")
+
 
 
 @app.get("/ping")
@@ -184,8 +190,22 @@ async def webhook_evolution(request: Request):
             return {"status": "ignored"}
 
         user_text = extract_text_from_event(event_json)
+
+        # Si no hay texto, intentar extraer audio y transcribirlo
         if not user_text:
-            logger.info("No text found in message")
+            audio_info = extract_audio_from_event(event_json)
+            if audio_info:
+                logger.info(f"🎙️ Audio detectado (Evolution): {audio_info}")
+                try:
+                    audio_bytes = await download_media(audio_info["url"], provider="evolution")
+                    user_text = await transcribe_audio(audio_bytes, filename="note.ogg", mimetype=audio_info.get("mimetype", "audio/ogg"))
+                    logger.info(f"📝 Transcripción obtenida: '{user_text}'")
+                except Exception as e:
+                    logger.error(f"❌ Error transcribiendo audio Evolution: {str(e)}")
+                    user_text = None
+        
+        if not user_text:
+            logger.info("No text or audio to process")
             return {"status": "no_text"}
 
         chat_id = get_chat_id(event_json)
@@ -203,21 +223,26 @@ async def webhook_evolution(request: Request):
 @app.post("/webhook/twilio")
 async def webhook_twilio(
     request: Request,
-    Body: str = Form(...),
-    From: str = Form(...),
-    To: str = Form(...),
-    MessageSid: str = Form(...),
+    Body: str = Form(None),
+    From: str = Form(None),
+    To: str = Form(None),
+    MessageSid: str = Form(None),
     x_twilio_signature: str = Header(None, alias="X-Twilio-Signature")
 ):
     """Webhook para Twilio WhatsApp."""
     try:
-        form_data = {
-            "Body": Body,
-            "From": From,
-            "To": To,
-            "MessageSid": MessageSid
-        }
-        
+        form = await request.form()
+        form_data = {k: v for k, v in form.items()}
+        # Asegurar claves principales si FastAPI no las mapeó
+        if Body is not None:
+            form_data.setdefault("Body", Body)
+        if From is not None:
+            form_data.setdefault("From", From)
+        if To is not None:
+            form_data.setdefault("To", To)
+        if MessageSid is not None:
+            form_data.setdefault("MessageSid", MessageSid)
+
         logger.info(f"Received Twilio webhook: {form_data}")
         
         # Validar webhook en producción
@@ -229,15 +254,26 @@ async def webhook_twilio(
         logger.info("⚠️ Webhook signature validation temporarily disabled")
         
         user_text = extract_text_from_twilio_event(form_data)
+        # Si no hay texto, intentar transcribir audio
         if not user_text:
-            logger.info("No text found in Twilio message")
+            audio_info = extract_audio_from_twilio_event(form_data)
+            if audio_info:
+                logger.info(f"🎙️ Audio detectado (Twilio): {audio_info}")
+                try:
+                    audio_bytes = await download_media(audio_info["url"], provider="twilio")
+                    user_text = await transcribe_audio(audio_bytes, filename="note.ogg", mimetype=audio_info.get("mimetype", "audio/ogg"))
+                    logger.info(f"📝 Transcripción obtenida (Twilio): '{user_text}'")
+                except Exception as e:
+                    logger.error(f"❌ Error transcribiendo audio Twilio: {str(e)}")
+                    user_text = None
+        if not user_text:
+            logger.info("No text or audio found in Twilio message")
             return PlainTextResponse("OK")
         
         chat_id = get_twilio_chat_id(form_data)
         logger.info(f"Processing Twilio message: '{user_text}' from {chat_id}")
         
-        # Para Twilio, necesitamos manejar la respuesta de manera diferente
-        # porque no podemos usar async/await en el webhook
+        # Para Twilio, respondemos con TwiML
         try:
             reply_text = process(user_text, chat_id)
             logger.info(f"Generated reply: {reply_text[:100]}...")
@@ -255,6 +291,46 @@ async def webhook_twilio(
     except Exception as e:
         logger.error(f"Twilio webhook error: {str(e)}", exc_info=True)
         return PlainTextResponse("Error", status_code=500)
+
+
+async def download_media(url: str, provider: str = "evolution") -> bytes:
+    """Descarga bytes de un media URL, manejando autenticación por proveedor."""
+    try:
+        headers = {}
+        auth = None
+        if provider == "evolution":
+            headers["apikey"] = EVOLUTION_API_KEY or ""
+        elif provider == "twilio":
+            # Twilio media requiere auth básica con SID y TOKEN
+            from .twilio_client import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+            auth = (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(url, headers=headers, auth=auth)
+            resp.raise_for_status()
+            return resp.content
+    except Exception as e:
+        raise Exception(f"Error descargando media: {str(e)}")
+
+
+async def transcribe_audio(audio_bytes: bytes, filename: str = "audio.ogg", mimetype: str = "audio/ogg") -> str:
+    """Transcribe audio a texto usando OpenAI Whisper (o modelo configurado)."""
+    try:
+        file_tuple = (filename, BytesIO(audio_bytes), mimetype)
+        # API moderna de OpenAI para transcripción
+        result = openai.audio.transcriptions.create(
+            model=TRANSCRIPTION_MODEL,
+            file=file_tuple,
+        )
+        # Dependiendo de la versión, puede devolver .text o .data[0].text
+        text = getattr(result, "text", None)
+        if not text and hasattr(result, "data") and result.data:
+            text = getattr(result.data[0], "text", None)
+        if not text:
+            raise Exception("Respuesta de transcripción sin texto")
+        return text.strip()
+    except Exception as e:
+        raise Exception(f"Error en transcripción: {str(e)}")
 
 
 async def send_whatsapp_message(to_number: str, text: str, show_typing: bool = False):

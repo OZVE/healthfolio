@@ -4,7 +4,7 @@ import os
 import asyncio
 import time
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from dotenv import load_dotenv
 from redis import Redis
 
@@ -58,9 +58,85 @@ def extract_text_from_event(event: Dict[str, Any]) -> str | None:
     return None
 
 
+def extract_audio_from_event(event: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """Intenta obtener información de audio (nota de voz) del mensaje Evolution.
+
+    Retorna un dict con al menos: {"url": str, "mimetype": str} si encuentra audio.
+    """
+    try:
+        data = event.get("data", {})
+        msg_obj = data.get("message", {})
+
+        # Casos comunes: audioMessage, voiceMessage, ptt (push-to-talk)
+        for key in ["audioMessage", "voiceMessage", "ptt", "audio", "media"]:
+            if key in msg_obj and isinstance(msg_obj[key], dict):
+                audio_obj = msg_obj[key]
+                url = audio_obj.get("url") or audio_obj.get("directPath") or audio_obj.get("mediaUrl")
+                mimetype = audio_obj.get("mimetype") or audio_obj.get("mimeType") or "audio/ogg"
+                if url:
+                    return {"url": url, "mimetype": mimetype}
+
+        # Búsqueda profunda de una URL de audio
+        def _walk_and_find(obj: Any) -> Optional[Tuple[str, str]]:
+            try:
+                if isinstance(obj, dict):
+                    # Si tiene mimetype de audio y url
+                    mt = obj.get("mimetype") or obj.get("mimeType")
+                    u = obj.get("url") or obj.get("mediaUrl") or obj.get("directPath")
+                    if u and (mt and str(mt).startswith("audio/")):
+                        return str(u), str(mt)
+                    # Buscar recursivamente
+                    for v in obj.values():
+                        found = _walk_and_find(v)
+                        if found:
+                            return found
+                elif isinstance(obj, list):
+                    for v in obj:
+                        found = _walk_and_find(v)
+                        if found:
+                            return found
+            except Exception:
+                return None
+            return None
+
+        found = _walk_and_find(msg_obj)
+        if found:
+            url, mimetype = found
+            return {"url": url, "mimetype": mimetype}
+    except Exception:
+        pass
+    return None
+
+
 def extract_text_from_twilio_event(form_data: Dict[str, Any]) -> str | None:
     """Extrae el texto del mensaje de un webhook de Twilio."""
     return form_data.get("Body")
+
+
+def extract_audio_from_twilio_event(form_data: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """Obtiene datos de audio (nota de voz) desde el webhook de Twilio.
+
+    Twilio envía: NumMedia, MediaUrl{N}, MediaContentType{N}
+    Retorna {"url": str, "mimetype": str} si encuentra audio.
+    """
+    try:
+        num_media = int(form_data.get("NumMedia", "0"))
+    except Exception:
+        num_media = 0
+
+    if num_media <= 0:
+        return None
+
+    # Revisar el primer media que sea audio
+    for i in range(num_media):
+        url_key = f"MediaUrl{i}"
+        type_key = f"MediaContentType{i}"
+        url = form_data.get(url_key)
+        ctype = form_data.get(type_key, "")
+        if url and str(ctype).startswith("audio/"):
+            return {"url": url, "mimetype": ctype}
+
+    return None
 
 
 def get_chat_id(event: Dict[str, Any]) -> str:
