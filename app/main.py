@@ -197,8 +197,20 @@ async def webhook_evolution(request: Request):
             if audio_info:
                 logger.info(f"🎙️ Audio detectado (Evolution): {audio_info}")
                 try:
-                    audio_bytes = await download_media(audio_info["url"], provider="evolution")
-                    user_text = await transcribe_audio(audio_bytes, filename="note.ogg", mimetype=audio_info.get("mimetype", "audio/ogg"))
+                    if "base64" in audio_info:
+                        import base64
+                        audio_bytes = base64.b64decode(audio_info["base64"])  # Ya decodificado
+                    else:
+                        audio_bytes = await download_media(audio_info["url"], provider="evolution")
+                    # Elegir extensión adecuada a partir del mimetype
+                    mt = audio_info.get("mimetype", "audio/ogg")
+                    ext = "ogg"
+                    if "/" in mt:
+                        ext = mt.split("/")[-1]
+                        if ";" in ext:
+                            ext = ext.split(";")[0]
+                    filename = f"note.{ext or 'ogg'}"
+                    user_text = await transcribe_audio(audio_bytes, filename=filename, mimetype=mt)
                     logger.info(f"📝 Transcripción obtenida: '{user_text}'")
                 except Exception as e:
                     logger.error(f"❌ Error transcribiendo audio Evolution: {str(e)}")
@@ -261,7 +273,14 @@ async def webhook_twilio(
                 logger.info(f"🎙️ Audio detectado (Twilio): {audio_info}")
                 try:
                     audio_bytes = await download_media(audio_info["url"], provider="twilio")
-                    user_text = await transcribe_audio(audio_bytes, filename="note.ogg", mimetype=audio_info.get("mimetype", "audio/ogg"))
+                    mt = audio_info.get("mimetype", "audio/ogg")
+                    ext = "ogg"
+                    if "/" in mt:
+                        ext = mt.split("/")[-1]
+                        if ";" in ext:
+                            ext = ext.split(";")[0]
+                    filename = f"note.{ext or 'ogg'}"
+                    user_text = await transcribe_audio(audio_bytes, filename=filename, mimetype=mt)
                     logger.info(f"📝 Transcripción obtenida (Twilio): '{user_text}'")
                 except Exception as e:
                     logger.error(f"❌ Error transcribiendo audio Twilio: {str(e)}")
@@ -316,16 +335,18 @@ async def download_media(url: str, provider: str = "evolution") -> bytes:
 async def transcribe_audio(audio_bytes: bytes, filename: str = "audio.ogg", mimetype: str = "audio/ogg") -> str:
     """Transcribe audio a texto usando OpenAI Whisper (o modelo configurado)."""
     try:
-        file_tuple = (filename, BytesIO(audio_bytes), mimetype)
-        # API moderna de OpenAI para transcripción
+        # OpenAI requiere archivo con nombre válido
+        file_io = BytesIO(audio_bytes)
+        file_io.name = filename  # Establece nombre de archivo para el multipart
+
+        # API de transcripciones
         result = openai.audio.transcriptions.create(
             model=TRANSCRIPTION_MODEL,
-            file=file_tuple,
+            file=file_io,
+            response_format="json",
         )
-        # Dependiendo de la versión, puede devolver .text o .data[0].text
+
         text = getattr(result, "text", None)
-        if not text and hasattr(result, "data") and result.data:
-            text = getattr(result.data[0], "text", None)
         if not text:
             raise Exception("Respuesta de transcripción sin texto")
         return text.strip()

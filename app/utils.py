@@ -67,12 +67,24 @@ def extract_audio_from_event(event: Dict[str, Any]) -> Optional[Dict[str, str]]:
         data = event.get("data", {})
         msg_obj = data.get("message", {})
 
+        # Preferir payload base64 si está presente (Evolution suele entregar audio decodificado aquí)
+        if isinstance(msg_obj, dict) and "base64" in msg_obj and msg_obj.get("base64"):
+            # Intentar detectar mimetype desde audioMessage si existe
+            mimetype = "audio/ogg"
+            audio_msg = msg_obj.get("audioMessage") or msg_obj.get("voiceMessage") or {}
+            mt_candidate = audio_msg.get("mimetype") or audio_msg.get("mimeType")
+            if isinstance(mt_candidate, str) and mt_candidate:
+                mimetype = mt_candidate.split(";")[0].strip()
+            return {"base64": msg_obj["base64"], "mimetype": mimetype}
+
         # Casos comunes: audioMessage, voiceMessage, ptt (push-to-talk)
         for key in ["audioMessage", "voiceMessage", "ptt", "audio", "media"]:
             if key in msg_obj and isinstance(msg_obj[key], dict):
                 audio_obj = msg_obj[key]
                 url = audio_obj.get("url") or audio_obj.get("directPath") or audio_obj.get("mediaUrl")
                 mimetype = audio_obj.get("mimetype") or audio_obj.get("mimeType") or "audio/ogg"
+                if isinstance(mimetype, str):
+                    mimetype = mimetype.split(";")[0].strip()
                 if url:
                     return {"url": url, "mimetype": mimetype}
 
@@ -84,7 +96,7 @@ def extract_audio_from_event(event: Dict[str, Any]) -> Optional[Dict[str, str]]:
                     mt = obj.get("mimetype") or obj.get("mimeType")
                     u = obj.get("url") or obj.get("mediaUrl") or obj.get("directPath")
                     if u and (mt and str(mt).startswith("audio/")):
-                        return str(u), str(mt)
+                        return str(u), str(mt).split(";")[0].strip()
                     # Buscar recursivamente
                     for v in obj.values():
                         found = _walk_and_find(v)
