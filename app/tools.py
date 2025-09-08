@@ -75,6 +75,8 @@ def normalize_specialty_search(specialty: str) -> List[str]:
         "nutrición": ["nutricionista", "nutrición clínica", "nutrición"],
         "nutricion": ["nutricionista", "nutrición clínica", "nutrición"],
         "nutricionista": ["nutricionista", "nutrición clínica", "nutrición"],
+        "nutriólogo": ["nutricionista", "nutrición clínica", "nutrición"],
+        "nutrióloga": ["nutricionista", "nutrición clínica", "nutrición"],
         "nutrologo": ["nutricionista", "nutrición clínica", "nutrición"],
         "nutrologa": ["nutricionista", "nutrición clínica", "nutrición"],
         "dieta": ["nutricionista", "nutrición clínica", "nutrición"],
@@ -206,11 +208,18 @@ def normalize_specialty_search(specialty: str) -> List[str]:
         "chicos": ["pediatría", "niños", "infantil"],
         "chicas": ["pediatría", "niños", "infantil"],
         
-        "enfermería": ["enfermera", "tens"],
-        "enfermeria": ["enfermera", "tens"],
-        "enfermera": ["enfermera", "tens"],
-        "enfermero": ["enfermera", "tens"],
-        "tens": ["tens", "enfermera"],
+        "enfermería": ["enfermera", "tens", "enfermero"],
+        "enfermeria": ["enfermera", "tens", "enfermero"],
+        "enfermera": ["enfermera", "tens", "enfermero"],
+        "enfermero": ["enfermera", "tens", "enfermero"],
+        "tens": ["tens", "enfermera", "enfermero"],
+        "enfermeras": ["enfermera", "tens", "enfermero"],
+        "enfermeros": ["enfermera", "tens", "enfermero"],
+
+        # Agregar términos específicos de enfermería
+        "cuidados paliativos": ["enfermera", "enfermero", "tens"],
+        "paliativos": ["enfermera", "enfermero", "tens"],
+        "cuidados": ["enfermera", "enfermero", "tens"],
         
         "medicina general": ["médico"],
         "medico general": ["médico"],
@@ -518,7 +527,10 @@ def find_professionals(specialty: str, city: str, availability: str = None) -> L
                 logger.debug(f"🔍 City match (pero no professional/availability) en fila {i+1}: {r}")
         
         logger.info(f"📋 Total matches encontrados: {len(matches)}")
-        return matches
+        
+        # Aplicar validación de resultados
+        validated_matches = validate_search_results(f"{specialty} {city}", matches)
+        return validated_matches
         
     except Exception as e:
         logger.error(f"❌ Error accediendo a Google Sheet: {str(e)}")
@@ -900,7 +912,10 @@ def search_professionals_flexible(search_query: str, search_criteria: Dict[str, 
                     matches.append(record)
         
         logger.info(f"📋 Total matches encontrados: {len(matches)}")
-        return matches
+        
+        # Aplicar validación de resultados
+        validated_matches = validate_search_results(search_query, matches)
+        return validated_matches
         
     except Exception as e:
         logger.error(f"❌ Error en búsqueda flexible: {str(e)}")
@@ -978,6 +993,47 @@ def check_multi_value_field(field_value: str, search_terms: List[str]) -> bool:
                     return True
     
     return False
+
+
+def validate_search_results(query: str, results: List[Dict]) -> List[Dict]:
+    """
+    Valida que los resultados de búsqueda coincidan con la consulta del usuario.
+    """
+    query_lower = query.lower()
+    
+    # Detectar qué tipo de profesional se solicitó
+    requested_profession = None
+    if any(word in query_lower for word in ["enfermera", "enfermero", "enfermería"]):
+        requested_profession = "enfermera"
+    elif any(word in query_lower for word in ["nutricionista", "nutrición", "nutriólogo"]):
+        requested_profession = "nutricionista"
+    elif any(word in query_lower for word in ["médico", "doctor"]):
+        requested_profession = "médico"
+    
+    if not requested_profession:
+        return results
+    
+    # Filtrar resultados para asegurar que coincidan
+    validated_results = []
+    for result in results:
+        title = str(result.get("title", "")).lower()
+        specialty = str(result.get("specialty", "")).lower()
+        
+        is_valid = False
+        if requested_profession == "enfermera":
+            is_valid = any(word in title for word in ["enfermera", "enfermero", "tens"])
+        elif requested_profession == "nutricionista":
+            is_valid = "nutricionista" in title
+        elif requested_profession == "médico":
+            is_valid = any(word in title for word in ["médico", "doctor"])
+        
+        if is_valid:
+            validated_results.append(result)
+        else:
+            logger.warning(f"⚠️ Resultado filtrado: {result.get('name', 'N/A')} - {title} no coincide con {requested_profession}")
+    
+    logger.info(f"✅ Validación completada: {len(results)} -> {len(validated_results)} resultados válidos")
+    return validated_results
 
 
 def get_database_schema() -> Dict[str, Any]:

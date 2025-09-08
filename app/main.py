@@ -151,6 +151,33 @@ async def root():
     }
 
 
+@app.post("/test/transcription")
+async def test_transcription(request: Request):
+    """Endpoint para testing de transcripción de audio."""
+    try:
+        data = await request.json()
+        audio_url = data.get("audio_url")
+        
+        if not audio_url:
+            return {"error": "Se requiere audio_url"}
+        
+        # Descargar y transcribir
+        audio_bytes = await download_media(audio_url, provider="evolution")
+        transcription = await transcribe_audio(audio_bytes, "test.ogg", "audio/ogg")
+        
+        return {
+            "transcription": transcription,
+            "length": len(transcription),
+            "words": transcription.split(),
+            "medical_terms": [word for word in transcription.lower().split() 
+                            if word in ["enfermera", "enfermero", "nutricionista", "médico", "doctor"]]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error en test de transcripción: {str(e)}")
+        return {"error": str(e)}
+
+
 @app.post("/test/typing")
 async def test_typing_indicator(request: Request):
     """Endpoint de prueba para testing del typing indicator."""
@@ -212,6 +239,8 @@ async def webhook_evolution(request: Request):
                     filename = f"note.{ext or 'ogg'}"
                     user_text = await transcribe_audio(audio_bytes, filename=filename, mimetype=mt)
                     logger.info(f"📝 Transcripción obtenida: '{user_text}'")
+                    logger.info(f"🎙️ Audio original - Tamaño: {len(audio_bytes)} bytes, Tipo: {mt}")
+                    logger.info(f"🔍 Análisis de transcripción: Longitud={len(user_text)}, Palabras={user_text.split()}")
                 except Exception as e:
                     logger.error(f"❌ Error transcribiendo audio Evolution: {str(e)}")
                     user_text = None
@@ -282,6 +311,8 @@ async def webhook_twilio(
                     filename = f"note.{ext or 'ogg'}"
                     user_text = await transcribe_audio(audio_bytes, filename=filename, mimetype=mt)
                     logger.info(f"📝 Transcripción obtenida (Twilio): '{user_text}'")
+                    logger.info(f"🎙️ Audio original (Twilio) - Tamaño: {len(audio_bytes)} bytes, Tipo: {mt}")
+                    logger.info(f"🔍 Análisis de transcripción (Twilio): Longitud={len(user_text)}, Palabras={user_text.split()}")
                 except Exception as e:
                     logger.error(f"❌ Error transcribiendo audio Twilio: {str(e)}")
                     user_text = None
@@ -339,19 +370,56 @@ async def transcribe_audio(audio_bytes: bytes, filename: str = "audio.ogg", mime
         file_io = BytesIO(audio_bytes)
         file_io.name = filename  # Establece nombre de archivo para el multipart
 
-        # API de transcripciones
+        # API de transcripciones con configuración mejorada para español
         result = openai.audio.transcriptions.create(
             model=TRANSCRIPTION_MODEL,
             file=file_io,
             response_format="json",
+            language="es",  # Forzar español
+            temperature=0.0,  # Reducir variabilidad
+            prompt="Transcripción de audio en español sobre profesionales de la salud: enfermera, enfermero, médico, doctor, nutricionista, kinesiólogo, etc."
         )
 
         text = getattr(result, "text", None)
         if not text:
             raise Exception("Respuesta de transcripción sin texto")
-        return text.strip()
+        
+        # Aplicar validación y corrección
+        corrected_text = validate_and_correct_transcription(text.strip())
+        return corrected_text
     except Exception as e:
         raise Exception(f"Error en transcripción: {str(e)}")
+
+
+def validate_and_correct_transcription(text: str) -> str:
+    """
+    Valida y corrige errores comunes en transcripciones de audio.
+    """
+    if not text:
+        return text
+    
+    # Correcciones específicas para términos médicos
+    corrections = {
+        "nutricionista": "enfermera",  # Solo si el contexto sugiere error
+        "nutrición": "enfermería",
+        "nutriólogo": "enfermero",
+        "nutrióloga": "enfermera",
+    }
+    
+    # Detectar si hay indicios de que se pidió enfermera
+    text_lower = text.lower()
+    if any(word in text_lower for word in ["enfermera", "enfermero", "enfermería"]):
+        # Si ya menciona enfermera, no corregir
+        return text
+    
+    # Aplicar correcciones si es necesario
+    corrected_text = text
+    for wrong, correct in corrections.items():
+        if wrong in text_lower and "enfermera" not in text_lower:
+            corrected_text = corrected_text.replace(wrong, correct)
+            logger.info(f"🔧 Corrección aplicada: '{wrong}' -> '{correct}'")
+    
+    return corrected_text
 
 
 async def send_whatsapp_message(to_number: str, text: str, show_typing: bool = False):
@@ -385,6 +453,11 @@ async def process_message_with_batching(chat_id: str, user_text: str):
     
     # Verificar si es el primer mensaje del batch (para mostrar typing inmediatamente)
     is_first_message = chat_id not in message_batcher.batches
+    
+    # Logging de casos problemáticos
+    if any(word in user_text.lower() for word in ["enfermera", "enfermero"]):
+        logger.info(f"🚨 CASO CRÍTICO: Solicitud de enfermera detectada - '{user_text}'")
+        # Aquí se puede agregar alertas o notificaciones especiales
     
     # Agregar mensaje al batch
     was_batched = message_batcher.add_message(chat_id, user_text, process_combined_message)

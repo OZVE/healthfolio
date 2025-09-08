@@ -143,6 +143,8 @@ def call_llm(messages: List[Dict[str, str]], tools: List[Dict[str, Any]]):
 
 def process(user_input: str, chat_id: str) -> str:
     logger.info(f"🔍 Processing user input: '{user_input}' for chat_id: {chat_id}")
+    logger.info(f"🎯 Tipo de entrada: {'AUDIO' if 'transcripción' in user_input.lower() else 'TEXTO'}")
+    logger.info(f"🔍 Palabras clave detectadas: {[word for word in user_input.lower().split() if word in ['enfermera', 'enfermero', 'nutricionista', 'nutrición', 'médico', 'doctor']]}")
     history = get_memory(chat_id)
     logger.info(f"📚 Retrieved {len(history)} messages from memory")
     messages = build_messages(SYSTEM_TEXT, history, user_input)
