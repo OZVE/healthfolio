@@ -1,0 +1,60 @@
+# Dockerfile optimizado para producción con fallbacks
+# Soluciona problemas de Docker Hub y optimiza el build
+
+# Usar imagen más estable y disponible
+FROM python:3.11-slim
+
+# Metadatos
+LABEL maintainer="Healtfolio Team"
+LABEL description="Healtfolio WhatsApp Bot - Production Build"
+
+# Variables de entorno para optimización
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Instalar dependencias del sistema de forma optimizada
+RUN apt-get update && apt-get install -y \
+    # Dependencias mínimas necesarias
+    curl \
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
+
+# Crear usuario no-root primero (mejores prácticas de seguridad)
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Configurar directorio de trabajo
+WORKDIR /app
+
+# Copiar requirements primero (para aprovechar cache de Docker)
+COPY requirements.txt .
+
+# Instalar dependencias Python con optimizaciones
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip cache purge
+
+# Copiar código de la aplicación
+COPY ./app ./app
+COPY start.sh ./start.sh
+
+# Cambiar permisos
+RUN chmod +x start.sh \
+    && chown -R appuser:appuser /app
+
+# Cambiar a usuario no-root
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Exponer puerto
+EXPOSE 8000
+
+# Comando para ejecutar la aplicación
+CMD ["./start.sh"]
