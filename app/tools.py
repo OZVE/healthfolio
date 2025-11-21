@@ -18,7 +18,7 @@ SCOPES = [
 ]
 
 def load_google_credentials():
-    """Carga credenciales de Google Cloud desde variable de entorno."""
+    """Carga credenciales de Google Cloud desde variable de entorno o archivo."""
     service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     
     if not service_account_json:
@@ -32,8 +32,12 @@ def load_google_credentials():
             return Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
         except json.JSONDecodeError as e:
             raise ValueError(f"GOOGLE_SERVICE_ACCOUNT_JSON no es un JSON válido: {e}")
+    elif os.path.exists(service_account_json):
+        # Es una ruta a un archivo
+        logger.info(f"🔐 Cargando credenciales desde archivo: {service_account_json}")
+        return Credentials.from_service_account_file(service_account_json, scopes=SCOPES)
     else:
-        raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON debe contener el JSON completo de las credenciales")
+        raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON debe contener el JSON completo o una ruta válida a un archivo")
 
 # Inicializar cliente de Google Sheets
 creds = load_google_credentials()

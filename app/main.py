@@ -29,6 +29,7 @@ from .twilio_client import (
     validate_twilio_webhook,
     is_twilio_configured
 )
+from .access_control import check_user_access
 
 # Cargar variables de entorno
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -250,6 +251,13 @@ async def webhook_evolution(request: Request):
             return {"status": "no_text"}
 
         chat_id = get_chat_id(event_json)
+        
+        # VERIFICACIÓN DE ACCESO
+        if not check_user_access(chat_id):
+            logger.warning(f"⛔ Usuario no autorizado intentó acceder: {chat_id}")
+            await send_evolution_message(chat_id, "🚫 Lo siento, este es un servicio privado y tu número no está en la lista de usuarios autorizados.")
+            return {"status": "unauthorized"}
+
         logger.info(f"Processing message: '{user_text}' from {chat_id}")
         
         await process_message_with_batching(chat_id, user_text)
@@ -321,6 +329,14 @@ async def webhook_twilio(
             return PlainTextResponse("OK")
         
         chat_id = get_twilio_chat_id(form_data)
+        
+        # VERIFICACIÓN DE ACCESO
+        if not check_user_access(chat_id):
+            logger.warning(f"⛔ Usuario no autorizado intentó acceder (Twilio): {chat_id}")
+            rejection_msg = "🚫 Lo siento, este es un servicio privado y tu número no está en la lista de usuarios autorizados."
+            twiml_response = create_twilio_response(rejection_msg)
+            return PlainTextResponse(twiml_response, media_type="application/xml")
+
         logger.info(f"Processing Twilio message: '{user_text}' from {chat_id}")
         
         # Para Twilio, respondemos con TwiML
