@@ -145,22 +145,6 @@ def extract_audio_from_twilio_event(form_data: Dict[str, Any]) -> Optional[Dict[
         type_key = f"MediaContentType{i}"
         url = form_data.get(url_key)
         ctype = form_data.get(type_key, "")
-        if url and str(ctype).startswith("audio/"):
-            return {"url": url, "mimetype": ctype}
-
-    return None
-
-
-def get_chat_id(event: Dict[str, Any]) -> str:
-    """Extrae el número E164 de remoteJid."""
-    remote = event.get("data", {}).get("key", {}).get("remoteJid", "")
-    chat_id = remote.split("@")[0]
-    logger.info(f"📱 Chat ID extraído de Evolution: '{remote}' -> '{chat_id}'")
-    return chat_id
-
-
-def get_twilio_chat_id(form_data: Dict[str, Any]) -> str:
-    """Extrae el número de teléfono del webhook de Twilio."""
     from_number = form_data.get("From", "")
     # Remover el prefijo "whatsapp:" si está presente
     chat_id = from_number.replace("whatsapp:", "").replace("+", "")
